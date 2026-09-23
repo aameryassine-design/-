@@ -10,13 +10,13 @@ Dans **Supabase Dashboard > SQL Editor**, un fichier à la fois, dans cet ordre 
 | 2 | `migrations/20260923090200_schema_v2.sql` | `majalis`, colonnes ajoutées, `individual_tasks` (nouveau modèle), `task_entries`, `book_programs`, `memorization_programs` / `memorization_entries`, vues, triggers, bucket Storage |
 | 3 | `migrations/20260923090300_rls.sql` | fermeture de `anon`, suppression des policies v1, **toutes** les policies |
 | 4 | `migrations/20260923090400_data_migration.sql` | reprise des données v1 (ne fait rien si la base est vide) |
-| 5 | `tests/rls_tests.sql` | 91 scénarios, rôle par rôle — se termine par `rollback` |
+| 5 | `migrations/20260923090500_bootstrap_supervisor.sql` | profils des comptes créés avant la v2 + rôle `supervisor` du responsable ; échoue si ce compte n'existe pas encore (s'inscrire d'abord sur le site) |
+| 6 | `tests/rls_tests.sql` | 91 scénarios, rôle par rôle — se termine par `rollback` |
 
-Puis, une seule fois, se créer un compte sur le site et exécuter le bloc d'amorçage
-commenté à la fin du fichier 1 pour s'accorder le rôle `supervisor`.
+Le fichier 5 nomme un e-mail : il est propre à cette base, à adapter ailleurs.
 
 `schema.sql` reste le schéma **v1** : il ne sert plus que de référence historique.
-Pour une base neuve, exécuter `schema.sql` puis les 4 migrations.
+Pour une base neuve, exécuter `schema.sql` puis les 5 migrations.
 
 ## Les 5 rôles
 

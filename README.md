@@ -45,7 +45,7 @@ parviennent, même par requête directe. Voir
 
 ### 1. Base de données
 
-Exécuter, dans l'ordre, les 4 fichiers de [`supabase/migrations/`](supabase/migrations/)
+Exécuter, dans l'ordre, les 5 fichiers de [`supabase/migrations/`](supabase/migrations/)
 dans **Supabase Dashboard > SQL Editor**, puis `supabase/tests/rls_tests.sql`
 pour vérifier. Détail et ordre de bascule sans coupure :
 [`supabase/README.md`](supabase/README.md).
@@ -74,9 +74,9 @@ npm run dev
 ### 4. Premier compte
 
 1. S'inscrire depuis l'application avec son e-mail.
-2. Exécuter le bloc d'amorçage commenté à la fin de
-   `supabase/migrations/20260923090100_auth_roles.sql` pour s'accorder le rôle
-   `supervisor`.
+2. Exécuter `supabase/migrations/20260923090500_bootstrap_supervisor.sql`
+   (après y avoir mis son e-mail) : il crée les profils manquants et accorde
+   le rôle `supervisor`. Il échoue si le compte n'existe pas encore.
 3. Dans **الأعضاء**, renseigner l'e-mail de chaque membre : à son inscription
    avec ce même e-mail, son compte est relié à sa fiche et reçoit le rôle عضو.
 4. Dans **الحسابات**, accorder les rôles des responsables.
@@ -122,7 +122,7 @@ src/
 ├── hooks/           useAsync, useMembers, useSessions, useMemberSheet, useDashboardData
 └── lib/             supabase, types (miroir du schéma), constantes, dates, rôles, scoring
 supabase/
-├── migrations/      les 4 fichiers de bascule v1 → v2
+├── migrations/      les 5 fichiers de bascule v1 → v2 (+ amorçage)
 ├── tests/           vérification de la RLS, rôle par rôle
 └── schema.sql       schéma v1, conservé pour référence
 ```
