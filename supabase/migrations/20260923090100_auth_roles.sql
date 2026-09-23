@@ -19,6 +19,13 @@ begin
 end;
 $$;
 
+-- Les fonctions `language sql` de la section 5 lisent des tables et colonnes
+-- créées par le fichier 2/4 (`majalis`, `members.user_id`,
+-- `memorization_programs`…). Sans ce réglage, PostgreSQL valide leur corps dès
+-- la création et le fichier échoue. Elles seront résolues à l'appel, et aucune
+-- n'est appelée avant les policies du fichier 3/4.
+set check_function_bodies = off;
+
 -- ----------------------------------------------------------------------------
 --  1. Schéma privé `app`
 --     Contient uniquement des fonctions utilitaires utilisées par les policies.
