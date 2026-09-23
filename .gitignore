@@ -9,3 +9,11 @@ dist-ssr
 *.tsbuildinfo
 .vscode/*
 !.vscode/extensions.json
+
+# Capacitor : le projet Android est régénéré par `npm run android:add`
+android/
+ios/
+
+# Fichiers de travail de la CLI Supabase
+supabase/.temp/
+supabase/.branches/

@@ -1,17 +1,18 @@
-import { HashRouter, Route, Routes } from 'react-router-dom'
-import { Layout } from './components/Layout'
-import { PasswordGate } from './components/PasswordGate'
+import { lazy, Suspense } from 'react'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { AuthProvider, useAuth } from './auth/AuthProvider'
+import { HomeRedirect, RequireAuth, RequireRole } from './auth/Guards'
+import { LoginPage } from './auth/LoginPage'
+import { Loading } from './components/Feedback'
 import { ToastProvider } from './components/Toast'
 import { isSupabaseConfigured } from './lib/supabase'
-import { AttendancePage } from './pages/AttendancePage'
-import { BooksPage } from './pages/BooksPage'
-import { CouncilPage } from './pages/CouncilPage'
-import { DashboardPage } from './pages/DashboardPage'
-import { MembersPage } from './pages/MembersPage'
-import { MemorizationPage } from './pages/MemorizationPage'
-import { PreparationPage } from './pages/PreparationPage'
-import { QuranPage } from './pages/QuranPage'
-import { TasksPage } from './pages/TasksPage'
+
+/**
+ * Les deux moitiés de l'application sont chargées à la demande : l'APK d'un
+ * simple عضو ne télécharge jamais le code de l'administration, et inversement.
+ */
+const AdminApp = lazy(() => import('./admin/AdminApp'))
+const MemberApp = lazy(() => import('./app/MemberApp'))
 
 function ConfigurationError() {
   return (
@@ -27,29 +28,48 @@ function ConfigurationError() {
   )
 }
 
+/** Un utilisateur déjà connecté n'a rien à faire sur l'écran de connexion. */
+function LoginRoute() {
+  const { loading, session } = useAuth()
+  if (loading) return <Loading label="جارٍ التحقق…" />
+  if (session) return <Navigate to="/" replace />
+  return <LoginPage />
+}
+
 export default function App() {
   if (!isSupabaseConfigured) return <ConfigurationError />
 
   return (
-    <PasswordGate>
+    <AuthProvider>
       <ToastProvider>
         <HashRouter>
-          <Routes>
-            <Route element={<Layout />}>
-              <Route index element={<DashboardPage />} />
-              <Route path="members" element={<MembersPage />} />
-              <Route path="attendance" element={<AttendancePage />} />
-              <Route path="preparation" element={<PreparationPage />} />
-              <Route path="memorization" element={<MemorizationPage />} />
-              <Route path="tasks" element={<TasksPage />} />
-              <Route path="quran" element={<QuranPage />} />
-              <Route path="council" element={<CouncilPage />} />
-              <Route path="books" element={<BooksPage />} />
-              <Route path="*" element={<DashboardPage />} />
-            </Route>
-          </Routes>
+          <Suspense fallback={<Loading />}>
+            <Routes>
+              <Route path="/login" element={<LoginRoute />} />
+
+              <Route
+                path="/admin/*"
+                element={
+                  <RequireRole roles={['supervisor']}>
+                    <AdminApp />
+                  </RequireRole>
+                }
+              />
+
+              <Route
+                path="/app/*"
+                element={
+                  <RequireAuth>
+                    <MemberApp />
+                  </RequireAuth>
+                }
+              />
+
+              <Route path="*" element={<HomeRedirect />} />
+            </Routes>
+          </Suspense>
         </HashRouter>
       </ToastProvider>
-    </PasswordGate>
+    </AuthProvider>
   )
 }

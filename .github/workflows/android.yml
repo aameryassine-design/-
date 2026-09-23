@@ -1,0 +1,51 @@
+# Construction de l'APK. Le dossier android/ n'étant pas versionné, il est
+# régénéré ici à chaque exécution : rien à maintenir dans le dépôt.
+#
+# Secrets à créer dans Settings > Secrets and variables > Actions :
+#   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
+
+name: APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - run: npm ci
+
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
+      - run: npx cap add android
+      - run: npx cap sync android
+
+      - name: Gradle assembleDebug
+        run: |
+          chmod +x android/gradlew
+          cd android && ./gradlew assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: halaqa-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

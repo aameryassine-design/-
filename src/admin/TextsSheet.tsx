@@ -9,11 +9,11 @@ import { useMemberSheet } from '../hooks/useMemberSheet'
 import { useMembers } from '../hooks/useMembers'
 import { useSessions } from '../hooks/useSessions'
 import { COMPLETION_OPTIONS } from '../lib/constants'
-import type { CompletionStatus, MemorizationRecord } from '../lib/types'
+import type { CompletionStatus, MemorizationTextRecord } from '../lib/types'
 
 const SESSION_TYPES = ['حصة أسبوعية'] as const
 
-export function MemorizationPage() {
+export function TextsSheet() {
   const toast = useToast()
   const {
     sessions,
@@ -37,7 +37,7 @@ export function MemorizationPage() {
   const session = sessions.find((item) => item.id === sessionId) ?? null
 
   const { rows, loading: rowsLoading, error: rowsError, pending, save } =
-    useMemberSheet<MemorizationRecord>(
+    useMemberSheet<MemorizationTextRecord>(
       'memorization_texts',
       sessionId ? { session_id: sessionId } : null,
       'session_id,member_id',

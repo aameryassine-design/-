@@ -1,30 +1,54 @@
-# متابعة الحلقة — Suivi hebdomadaire de la halaqa
+# متابعة الحلقة — suivi de la halaqa (v2, multi-utilisateurs)
 
-Application web (React + Vite + TypeScript + Supabase) pour suivre les activités hebdomadaires
-d'un groupe. Interface entièrement en arabe, RTL, utilisable sur mobile et desktop.
-Un seul administrateur saisit les données pour tout le groupe.
+Application React + Vite + TypeScript + Supabase, entièrement en arabe RTL
+(IBM Plex Sans Arabic, dates `ar-MA`).
 
-## Contenu
+Une seule base de code pour deux usages :
 
-- **الأعضاء** — gestion des membres (ajout, modification, archivage, suppression).
-- **7 feuilles de suivi**, une par thématique :
-  1. الحضور في الموعد الأسبوعي والمواعيد الأخرى
-  2. مسألة التحضير
-  3. حفظ النصوص المقررة لكل حصة
-  4. الواجبات الفردية التعبدية
-  5. برنامج الحفظ (progression cumulable)
-  6. الحضور في المجلس الداخلي
-  7. قراءة الكتب المبرمجة
-- **البيان** — bilan agrégé par membre et par groupe, filtrable par période.
+| Chemin | Pour qui | Où |
+| --- | --- | --- |
+| `/admin/*` | le مشرف عام | le site (écrans denses, PC) |
+| `/app/*` | membres et responsables | l'APK Android (et le site) |
+
+Les deux moitiés sont chargées en *lazy loading* : l'APK d'un simple عضو ne
+télécharge jamais le code d'administration (`AdminApp` ≈ 53 kB, `MemberApp`
+≈ 38 kB, lecteur PDF ≈ 486 kB chargé seulement à l'ouverture d'un livre).
+
+## Les 5 rôles
+
+| Rôle | Fait quoi |
+| --- | --- |
+| **مشرف عام** | membres, مجالس, livres, comptes et rôles ; saisit الحضور الأسبوعي، مسألة التحضير، حفظ النصوص ; voit tout le bilan, y compris le détail des واجبات فردية |
+| **مسؤول الواجبات الفردية** | crée les tâches ; voit **uniquement** « أجاب / لم يجب » par membre et par jour |
+| **مسؤول الحفظ** | crée le programme de حفظ de chaque membre et ajoute les أثمان |
+| **مسؤول المجلس الداخلي** | note la présence des membres de **son** مجلس |
+| **عضو** | saisit ses واجبات, coche son ورد, lit et télécharge les PDF, suit sa progression |
+
+Un compte peut cumuler plusieurs rôles. **Un compte sans rôle ne voit rien.**
+
+## الواجبات الفردية — le modèle à 3 états
+
+| état | en base |
+| --- | --- |
+| أنجزت | ligne `task_entries`, statut `أنجزت` |
+| لم أنجز | ligne `task_entries`, statut `لم أنجز` |
+| لم يجب | **aucune ligne** ce jour-là |
+
+Le مسؤول الواجبات n'a **aucune** policy sur `task_entries`. Sa seule fenêtre
+est la vue `daily_participation` (`member_id`, `entry_date`, `has_responded`),
+agrégée par jour : ni les statuts, ni le nombre de tâches saisies ne lui
+parviennent, même par requête directe. Voir
+[`supabase/README.md`](supabase/README.md) et les 91 tests de
+[`supabase/tests/rls_tests.sql`](supabase/tests/rls_tests.sql).
 
 ## Installation
 
-### 1. Base de données Supabase
+### 1. Base de données
 
-1. Créer un projet sur [supabase.com](https://supabase.com).
-2. Ouvrir **SQL Editor > New query**, coller le contenu de [`supabase/schema.sql`](supabase/schema.sql)
-   et exécuter.
-3. Récupérer dans **Project Settings > API** : `Project URL` et la clé `anon public`.
+Exécuter, dans l'ordre, les 4 fichiers de [`supabase/migrations/`](supabase/migrations/)
+dans **Supabase Dashboard > SQL Editor**, puis `supabase/tests/rls_tests.sql`
+pour vérifier. Détail et ordre de bascule sans coupure :
+[`supabase/README.md`](supabase/README.md).
 
 ### 2. Variables d'environnement
 
@@ -32,13 +56,13 @@ Un seul administrateur saisit les données pour tout le groupe.
 cp .env.example .env
 ```
 
-Puis remplir `.env` :
-
 ```
 VITE_SUPABASE_URL=https://xxxxxxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOi...
-VITE_APP_PASSWORD=le-mot-de-passe-de-ton-choix
 ```
+
+Il n'y a plus de `VITE_APP_PASSWORD` : la clé `anon` ne donne accès à aucune
+donnée, tout passe par Supabase Auth et les policies RLS.
 
 ### 3. Lancer en local
 
@@ -47,70 +71,72 @@ npm install
 npm run dev
 ```
 
-## Déploiement statique (GitHub Pages)
+### 4. Premier compte
 
-Le build est statique et utilise `base: './'` + un routeur par hash (`#/attendance`), donc il
-fonctionne sur n'importe quel sous-chemin sans configuration serveur.
+1. S'inscrire depuis l'application avec son e-mail.
+2. Exécuter le bloc d'amorçage commenté à la fin de
+   `supabase/migrations/20260923090100_auth_roles.sql` pour s'accorder le rôle
+   `supervisor`.
+3. Dans **الأعضاء**, renseigner l'e-mail de chaque membre : à son inscription
+   avec ce même e-mail, son compte est relié à sa fiche et reçoit le rôle عضو.
+4. Dans **الحسابات**, accorder les rôles des responsables.
+
+## Déploiement du site (Netlify)
+
+`netlify.toml` est prêt : build `npm run build`, publication `dist/`.
+Régler `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` dans
+**Site configuration > Environment variables**.
+
+Le routeur fonctionne par hash (`#/admin`, `#/app`), donc aucune configuration
+serveur particulière n'est nécessaire.
+
+## APK Android (Capacitor)
+
+Le dossier `android/` n'est pas versionné : il se régénère.
 
 ```bash
-npm run build      # produit dist/
+npm run android:add     # une seule fois, crée android/
+npm run android:sync    # build web + copie dans le projet Android
+npm run android:open    # ouvre Android Studio
+npm run android:apk     # APK de debug, sans Android Studio
 ```
 
-Déploiement automatique : le workflow [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml)
-construit et publie `dist/` à chaque push sur `main`. Avant le premier push :
+L'APK se retrouve dans `android/app/build/outputs/apk/debug/app-debug.apk`.
 
-1. Dans le dépôt GitHub : **Settings > Pages > Source = GitHub Actions**.
-2. Dans **Settings > Secrets and variables > Actions**, créer trois secrets :
-   `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_APP_PASSWORD`.
+Sans SDK Android en local, le workflow
+[`.github/workflows/android.yml`](.github/workflows/android.yml) le construit
+(déclenchement manuel ou sur un tag `v*`) et le publie en artefact. Il lui faut
+les secrets `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY`.
 
-## À propos de la sécurité
-
-Le mot de passe protège l'**affichage** de l'application, pas les **données** :
-
-- il est vérifié dans le navigateur et fait partie du bundle JavaScript public ;
-- l'URL Supabase et la clé `anon` le sont aussi, et les règles RLS du schéma autorisent
-  la lecture/écriture avec cette clé.
-
-Autrement dit : quelqu'un qui inspecte le code source du site peut atteindre la base.
-C'est acceptable pour des données de suivi interne non sensibles.
-
-Pour une vraie protection, basculer sur Supabase Auth (un seul compte e-mail/mot de passe) et
-remplacer `to anon` par `to authenticated` dans les policies de `supabase/schema.sql`.
+Le nom et l'identifiant de l'application se règlent dans `capacitor.config.ts`.
 
 ## Structure
 
 ```
 src/
-├── components/     # Composants réutilisables (feuilles, sélecteurs, dialogues)
-│   ├── SessionSheet.tsx    # Feuille générique « une ligne par membre » (présence, préparation)
-│   ├── SessionPicker.tsx   # Choix / création / suppression d'une séance
-│   ├── PeriodPicker.tsx    # Filtre de période (semaine, mois, personnalisé)
-│   ├── StatusPicker.tsx    # Boutons de statut en un clic
-│   ├── CommitInput.tsx     # Champ texte enregistré à la sortie du champ
-│   └── PasswordGate.tsx    # Verrouillage par mot de passe
-├── hooks/
-│   ├── useMemberSheet.ts   # Chargement + upsert d'une ligne par membre
-│   ├── useMembers.ts
-│   ├── useSessions.ts
-│   └── useDashboardData.ts # Agrégation des 7 indicateurs pour le bilan
-├── lib/
-│   ├── supabase.ts
-│   ├── types.ts            # Miroir TypeScript du schéma SQL
-│   ├── constants.ts        # Statuts, pondérations, navigation
-│   ├── dates.ts            # Semaines, mois, formatage arabe (ar-MA)
-│   └── scoring.ts          # Calcul des taux de complétion
-└── pages/                  # Une page par thématique + membres + bilan
+├── auth/            AuthProvider (session, rôles, fiche membre), connexion, gardes de route
+├── admin/           le site du مشرف عام : بيان, أعضاء, مجالس, feuilles, كتب, حسابات
+├── app/             les écrans mobiles : واجباتي, تقدّمي, الكتب + lecteur PDF,
+│                    مجلسي, متابعة الواجبات, برنامج الحفظ
+├── components/      feuilles de saisie, sélecteurs, dialogues, toasts
+├── hooks/           useAsync, useMembers, useSessions, useMemberSheet, useDashboardData
+└── lib/             supabase, types (miroir du schéma), constantes, dates, rôles, scoring
+supabase/
+├── migrations/      les 4 fichiers de bascule v1 → v2
+├── tests/           vérification de la RLS, rôle par rôle
+└── schema.sql       schéma v1, conservé pour référence
 ```
 
 ## Calcul du bilan
 
 | Statut | Poids |
 | --- | --- |
-| حاضر / حضّر / تم / منجز / أنهى | 100 % |
-| متأخر / جزئياً / قيد القراءة | 50 % |
-| غائب / لم يحضّر / لم يتم / غير منجز / لم يبدأ | 0 % |
+| حاضر / حضّر / تم / أنجزت | 100 % |
+| متأخر / جزئياً | 50 % |
+| غائب / لم يحضّر / لم يتم / لم أنجز | 0 % |
 | معذور | exclu du calcul |
 
-Seules les lignes réellement saisies comptent : un indicateur sans saisie sur la période affiche
-`—` et n'entre pas dans la moyenne du membre. La moyenne du groupe est la moyenne des taux
-individuels. Ces pondérations sont regroupées dans `src/lib/constants.ts`.
+Un واجب jamais renseigné (« لم يجب ») n'entre pas dans la note, mais apparaît
+dans la colonne **أيام الإجابة**. Les **أثمان** se comptent, ils ne se notent
+pas. Un indicateur sans aucune saisie sur la période affiche `—` et n'entre pas
+dans la moyenne ; la moyenne du groupe est la moyenne des taux individuels.

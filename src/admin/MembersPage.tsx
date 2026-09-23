@@ -3,21 +3,39 @@ import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../components/Toast'
+import { useAsync, unwrap } from '../hooks/useAsync'
 import { useMembers } from '../hooks/useMembers'
 import { errorMessage, supabase } from '../lib/supabase'
-import type { Member } from '../lib/types'
+import type { Majlis, Member } from '../lib/types'
 
 interface Draft {
   full_name: string
   phone: string
+  email: string
   note: string
+  majlis_id: string
 }
 
-const EMPTY_DRAFT: Draft = { full_name: '', phone: '', note: '' }
+const EMPTY_DRAFT: Draft = { full_name: '', phone: '', email: '', note: '', majlis_id: '' }
+
+function toPayload(draft: Draft) {
+  return {
+    full_name: draft.full_name.trim(),
+    phone: draft.phone.trim() || null,
+    email: draft.email.trim().toLowerCase() || null,
+    note: draft.note.trim() || null,
+    majlis_id: draft.majlis_id || null,
+  }
+}
 
 export function MembersPage() {
   const toast = useToast()
   const { members, loading, error, refresh } = useMembers(true)
+  const majalis = useAsync(
+    async () => unwrap<Majlis[]>(await supabase.from('majalis').select('*').order('name')),
+    [],
+  )
+
   const [showArchived, setShowArchived] = useState(false)
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -25,18 +43,17 @@ export function MembersPage() {
   const [pendingDelete, setPendingDelete] = useState<Member | null>(null)
   const [busy, setBusy] = useState(false)
 
+  const majlisName = (id: string | null) =>
+    majalis.data?.find((item) => item.id === id)?.name ?? '—'
+
   const visible = members.filter((member) => showArchived || member.status === 'نشط')
   const archivedCount = members.filter((member) => member.status === 'مؤرشف').length
+  const linkedCount = members.filter((member) => member.user_id).length
 
   const add = async () => {
-    const name = draft.full_name.trim()
-    if (!name) return
+    if (!draft.full_name.trim()) return
     setBusy(true)
-    const { error: insertError } = await supabase.from('members').insert({
-      full_name: name,
-      phone: draft.phone.trim() || null,
-      note: draft.note.trim() || null,
-    })
+    const { error: insertError } = await supabase.from('members').insert(toPayload(draft))
     setBusy(false)
     if (insertError) {
       toast(errorMessage(insertError), 'error')
@@ -48,15 +65,10 @@ export function MembersPage() {
   }
 
   const saveEdit = async (id: string) => {
-    const name = editDraft.full_name.trim()
-    if (!name) return
+    if (!editDraft.full_name.trim()) return
     const { error: updateError } = await supabase
       .from('members')
-      .update({
-        full_name: name,
-        phone: editDraft.phone.trim() || null,
-        note: editDraft.note.trim() || null,
-      })
+      .update(toPayload(editDraft))
       .eq('id', id)
 
     if (updateError) {
@@ -93,14 +105,36 @@ export function MembersPage() {
     await refresh()
   }
 
+  const startEdit = (member: Member) => {
+    setEditingId(member.id)
+    setEditDraft({
+      full_name: member.full_name,
+      phone: member.phone ?? '',
+      email: member.email ?? '',
+      note: member.note ?? '',
+      majlis_id: member.majlis_id ?? '',
+    })
+  }
+
+  const majlisSelect = (value: string, onChange: (next: string) => void) => (
+    <select className="input" value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="">بدون مجلس</option>
+      {(majalis.data ?? []).map((item) => (
+        <option key={item.id} value={item.id}>
+          {item.name}
+        </option>
+      ))}
+    </select>
+  )
+
   return (
     <section className="page">
       <PageHeader
         title="الأعضاء"
-        description="إدارة أعضاء الحلقة. الأرشفة تُخفي العضو من صفحات المتابعة مع الاحتفاظ بسجلّه."
+        description="أضف البريد الإلكتروني لكل عضو: عندما يسجّل بنفس البريد، يُربط حسابه ببطاقته تلقائياً ويصير «عضواً»."
       />
 
-      <ErrorBanner message={error} />
+      <ErrorBanner message={error ?? majalis.error} />
 
       <form
         className="card member-form"
@@ -119,6 +153,17 @@ export function MembersPage() {
             onChange={(event) => setDraft({ ...draft, full_name: event.target.value })}
           />
         </label>
+        <label className="grow">
+          <span className="label">البريد الإلكتروني</span>
+          <input
+            className="input"
+            type="email"
+            dir="ltr"
+            value={draft.email}
+            placeholder="name@example.com"
+            onChange={(event) => setDraft({ ...draft, email: event.target.value })}
+          />
+        </label>
         <label>
           <span className="label">الهاتف</span>
           <input
@@ -128,14 +173,9 @@ export function MembersPage() {
             onChange={(event) => setDraft({ ...draft, phone: event.target.value })}
           />
         </label>
-        <label className="grow">
-          <span className="label">ملاحظة</span>
-          <input
-            className="input"
-            value={draft.note}
-            placeholder="اختياري"
-            onChange={(event) => setDraft({ ...draft, note: event.target.value })}
-          />
+        <label>
+          <span className="label">المجلس</span>
+          {majlisSelect(draft.majlis_id, (majlis_id) => setDraft({ ...draft, majlis_id }))}
         </label>
         <button type="submit" className="btn btn--primary" disabled={busy}>
           {busy ? 'جارٍ الإضافة…' : '+ إضافة عضو'}
@@ -143,7 +183,15 @@ export function MembersPage() {
       </form>
 
       <div className="sheet-toolbar">
-        <span className="pill">عدد النشطين: {members.filter((m) => m.status === 'نشط').length}</span>
+        <div className="sheet-toolbar__stats">
+          <span className="pill">
+            النشطون: {members.filter((m) => m.status === 'نشط').length}
+          </span>
+          <span className="pill pill--good">حسابات مرتبطة: {linkedCount}</span>
+          <span className="pill pill--neutral">
+            في انتظار التسجيل: {members.length - linkedCount}
+          </span>
+        </div>
         {archivedCount > 0 ? (
           <label className="checkbox">
             <input
@@ -168,8 +216,10 @@ export function MembersPage() {
             <thead>
               <tr>
                 <th className="sheet__col-name">الاسم</th>
+                <th>البريد الإلكتروني</th>
+                <th>المجلس</th>
                 <th>الهاتف</th>
-                <th>ملاحظة</th>
+                <th>الحساب</th>
                 <th>الحالة</th>
                 <th className="sheet__col-actions">إجراءات</th>
               </tr>
@@ -189,8 +239,35 @@ export function MembersPage() {
                           }
                         />
                       ) : (
-                        member.full_name
+                        <>
+                          {member.full_name}
+                          {member.note ? (
+                            <span className="sheet__hint">{member.note}</span>
+                          ) : null}
+                        </>
                       )}
+                    </td>
+                    <td dir="ltr">
+                      {editing ? (
+                        <input
+                          className="input"
+                          type="email"
+                          dir="ltr"
+                          value={editDraft.email}
+                          onChange={(event) =>
+                            setEditDraft({ ...editDraft, email: event.target.value })
+                          }
+                        />
+                      ) : (
+                        (member.email ?? '—')
+                      )}
+                    </td>
+                    <td>
+                      {editing
+                        ? majlisSelect(editDraft.majlis_id, (majlis_id) =>
+                            setEditDraft({ ...editDraft, majlis_id }),
+                          )
+                        : majlisName(member.majlis_id)}
                     </td>
                     <td>
                       {editing ? (
@@ -206,22 +283,12 @@ export function MembersPage() {
                       )}
                     </td>
                     <td>
-                      {editing ? (
-                        <input
-                          className="input"
-                          value={editDraft.note}
-                          onChange={(event) =>
-                            setEditDraft({ ...editDraft, note: event.target.value })
-                          }
-                        />
-                      ) : (
-                        (member.note ?? '—')
-                      )}
+                      <span className={`pill pill--${member.user_id ? 'good' : 'neutral'}`}>
+                        {member.user_id ? 'مرتبط' : 'لم يسجّل بعد'}
+                      </span>
                     </td>
                     <td>
-                      <span
-                        className={`pill pill--${member.status === 'نشط' ? 'good' : 'neutral'}`}
-                      >
+                      <span className={`pill pill--${member.status === 'نشط' ? 'good' : 'neutral'}`}>
                         {member.status}
                       </span>
                     </td>
@@ -249,14 +316,7 @@ export function MembersPage() {
                             <button
                               type="button"
                               className="btn btn--ghost btn--sm"
-                              onClick={() => {
-                                setEditingId(member.id)
-                                setEditDraft({
-                                  full_name: member.full_name,
-                                  phone: member.phone ?? '',
-                                  note: member.note ?? '',
-                                })
-                              }}
+                              onClick={() => startEdit(member)}
                             >
                               تعديل
                             </button>
@@ -292,7 +352,7 @@ export function MembersPage() {
         title="حذف العضو نهائياً"
         message={
           pendingDelete
-            ? `سيتم حذف «${pendingDelete.full_name}» وجميع تسجيلاته في المحاور السبعة. لا يمكن التراجع — إن أردت الاحتفاظ بالسجل استعمل «أرشفة».`
+            ? `سيتم حذف «${pendingDelete.full_name}» وجميع تسجيلاته: الحضور والتحضير والنصوص والواجبات والحفظ. لا يمكن التراجع — إن أردت الاحتفاظ بالسجل استعمل «أرشفة».`
             : undefined
         }
         confirmLabel="حذف نهائي"

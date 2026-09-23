@@ -1054,3 +1054,295 @@ select.input {
     grid-template-columns: 1fr;
   }
 }
+
+/* ==========================================================================
+   v2 — écrans mobiles (APK), lecteur PDF et connexion
+   ========================================================================== */
+
+.gate__logo {
+  margin: 0 auto;
+}
+
+.gate__notice {
+  margin: 0;
+  color: var(--primary-dark);
+  font-size: 13px;
+}
+
+.gate__mail {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.banner--warn {
+  background: var(--mid-soft);
+  border: 1px solid var(--mid);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  color: var(--mid);
+  font-size: 13.5px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Coquille mobile ---------- */
+
+.mobile {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--bg);
+}
+
+.mobile__header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: max(12px, env(safe-area-inset-top)) 14px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile__title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.mobile__user {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.mobile__main {
+  flex: 1;
+  padding: 14px 14px 20px;
+}
+
+.mobile__tabs {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-around;
+  gap: 2px;
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.mobile-tab {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: center;
+  text-decoration: none;
+}
+
+.mobile-tab__icon {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.mobile-tab.is-active {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.mobile-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* ---------- Navigation par jour ---------- */
+
+.day-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.day-switch .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---------- Saisie d'un واجب ---------- */
+
+.task-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.task-row__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.task-row__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.task-row__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn--big {
+  flex: 1 1 0;
+  padding: 12px 10px;
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.btn--big.is-active {
+  font-weight: 700;
+}
+
+.task-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.book-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ---------- Accueil ---------- */
+
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--primary-soft);
+  border-color: var(--primary);
+}
+
+.home-hero__hello {
+  margin: 0;
+  color: var(--primary-dark);
+  font-size: 13px;
+}
+
+.home-hero__name {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.home-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-card__title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* ---------- Lecteur PDF ---------- */
+
+.reader {
+  gap: 10px;
+}
+
+.reader__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.reader__title {
+  flex: 1 1 auto;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reader__frame {
+  display: grid;
+  place-items: center;
+  min-height: 50vh;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+}
+
+.reader__canvas {
+  display: block;
+  max-width: 100%;
+  box-shadow: var(--shadow);
+}
+
+.reader__nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.reader__page {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reader__page .input {
+  width: 72px;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .summary-card__value {
+    font-size: 21px;
+  }
+
+  .member-form {
+    gap: 8px;
+  }
+}

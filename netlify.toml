@@ -1,0 +1,22 @@
+# Déploiement du site (interface du مشرف عام et de l'app web).
+# Les variables VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY se règlent dans
+# Netlify > Site configuration > Environment variables.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Le routeur fonctionne par hash (#/admin, #/app) : aucune réécriture n'est
+# nécessaire. Cette règle ne sert que si une URL profonde est ouverte à la main.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
