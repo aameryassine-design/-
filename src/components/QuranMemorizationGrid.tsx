@@ -1,6 +1,6 @@
 import { useState, useOptimistic, useTransition, useMemo, useEffect } from 'react'
 import { ATHMAN_CATALOG, type ThmounMeta, type SurahSegment } from '../data/athmanCatalog'
-import { getSurahsForHizb } from '../data/quranSurahsMapping'
+import { getSurahsTrackForHizb } from '../data/quranMapping'
 import { supabase } from '../lib/supabase'
 import './QuranMemorizationGrid.css'
 
@@ -261,7 +261,7 @@ export function QuranMemorizationGrid({ userId, onClose, memberName }: Props) {
           const masteredInHizb = athman.filter(
             (t) => optimisticProgress[t.id] === 'mastered',
           ).length
-          const surahsInHizb = getSurahsForHizb(hizbNumber)
+          const surahsInHizb = getSurahsTrackForHizb(hizbNumber)
 
           return (
             <div key={hizbNumber} className="hizb-card">
@@ -273,13 +273,13 @@ export function QuranMemorizationGrid({ userId, onClose, memberName }: Props) {
               {/* Ligne des Sourates (Superposition géométrique sur les 8 blocs) */}
               <div className="sourates-track" aria-label={`سور الحزب ${hizbNumber}`}>
                 {surahsInHizb.map((span, idx) => {
-                  const flex = span.flexWeight ?? (span.endQuarter - span.startQuarter + 1)
+                  const flex = span.flexWeight
                   const isCompact = flex <= 1.2
                   const hasCluster = span.clusterSurahs && span.clusterSurahs.length > 1
 
                   const tooltip = hasCluster
-                    ? `السور: ${span.clusterSurahs!.map((s) => s.surahNameAr).join(' ، ')} (الثمن ${span.startQuarter})`
-                    : `سورة ${span.surahNameAr} ${span.ayahRangeAr ? `(آيات ${span.ayahRangeAr})` : ''} — [أثمان ${span.startQuarter === span.endQuarter ? span.startQuarter : `${span.startQuarter} إلى ${span.endQuarter}`}]`
+                    ? `السور: ${span.clusterSurahs!.map((s) => s.name).join(' ، ')} (الثمن ${span.startQuarter})`
+                    : `سورة ${span.surahNameAr} — [أثمان ${span.startQuarter === span.endQuarter ? span.startQuarter : `${span.startQuarter} إلى ${span.endQuarter}`}]`
 
                   return (
                     <div

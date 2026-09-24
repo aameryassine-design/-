@@ -1655,3 +1655,80 @@ export function getSurahsInThmoun(thmounId: number): SurahMappingItem[] {
     (s) => s.start.thmoun_id <= thmounId && s.end.thmoun_id >= thmounId
   );
 }
+
+export interface HizbTrackSegment {
+  surahNumber: number;
+  surahNameAr: string;
+  startQuarter: number; // 1 à 8
+  endQuarter: number;   // 1 à 8
+  flexWeight: number;
+  isStartOfSurah: boolean;
+  isEndOfSurah: boolean;
+  clusterSurahs?: { id: number; name: string }[];
+}
+
+/**
+ * Génère les segments d'affichage géométrique des sourates pour la piste d'un Hizb donné (1 à 60).
+ * Aligne parfaitement chaque barre au-dessus de ses boutons d'Athman.
+ */
+export function getSurahsTrackForHizb(hizbNumber: number): HizbTrackSegment[] {
+  const crossing = getSurahsCrossingHizb(hizbNumber);
+  if (crossing.length === 0) return [];
+
+  // Cas spécial Hizb 1 : Al-Fatiha (fraction du thmoun 1) et Al-Baqarah (reste jusqu'à thmoun 8)
+  if (hizbNumber === 1) {
+    return [
+      {
+        surahNumber: 1,
+        surahNameAr: 'الفاتحة',
+        startQuarter: 1,
+        endQuarter: 1,
+        flexWeight: 0.85,
+        isStartOfSurah: true,
+        isEndOfSurah: true,
+      },
+      {
+        surahNumber: 2,
+        surahNameAr: 'البقرة',
+        startQuarter: 1,
+        endQuarter: 8,
+        flexWeight: 7.15,
+        isStartOfSurah: true,
+        isEndOfSurah: false,
+      },
+    ];
+  }
+
+  // Regrouper les sourates qui partagent le même intervalle exact [startQuarter, endQuarter]
+  const segments: HizbTrackSegment[] = [];
+  const visited = new Set<number>();
+
+  for (let i = 0; i < crossing.length; i++) {
+    const item = crossing[i];
+    if (visited.has(item.surah.id)) continue;
+
+    // Trouver toutes les sourates qui partagent le même startQuarter et endQuarter
+    const peers = crossing.filter(
+      (c) => c.startQuarter === item.startQuarter && c.endQuarter === item.endQuarter
+    );
+
+    peers.forEach((p) => visited.add(p.surah.id));
+
+    const spanLength = item.endQuarter - item.startQuarter + 1;
+    const flexWeight = spanLength;
+
+    segments.push({
+      surahNumber: item.surah.id,
+      surahNameAr: item.surah.name,
+      startQuarter: item.startQuarter,
+      endQuarter: item.endQuarter,
+      flexWeight,
+      isStartOfSurah: item.surah.start.hizb === hizbNumber && item.startQuarter === item.surah.start.thmoun,
+      isEndOfSurah: item.surah.end.hizb === hizbNumber && item.endQuarter === item.surah.end.thmoun,
+      clusterSurahs: peers.length > 1 ? peers.map((p) => ({ id: p.surah.id, name: p.surah.name })) : undefined,
+    });
+  }
+
+  return segments;
+}
+
