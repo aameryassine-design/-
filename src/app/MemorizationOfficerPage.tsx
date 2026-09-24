@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { useToast } from '../components/Toast'
 import { useAsync, unwrap } from '../hooks/useAsync'
@@ -92,6 +93,13 @@ export function MemorizationOfficerPage() {
       <div className="mobile-head">
         <h2 className="page-header__title">برنامج الحفظ</h2>
         <p className="page-header__description">سجّل ثمناً كلما أتمّ العضو مقرّره.</p>
+      </div>
+
+      <div style={{ marginBottom: '1rem' }}>
+        <Link to="/app/quran" className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span>📖</span>
+          <span>الانتقال إلى خريطة الأثمان (480 ثمناً)</span>
+        </Link>
       </div>
 
       <ErrorBanner message={board.error} />

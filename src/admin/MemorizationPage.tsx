@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../components/Toast'
@@ -78,6 +79,10 @@ export function MemorizationPage() {
         title="برنامج الحفظ"
         description="لكل عضو برنامجه. الأثمان يسجّلها مسؤول الحفظ من التطبيق؛ يمكنك التسجيل من هنا عند الحاجة."
       >
+        <Link to="/admin/quran" className="btn btn--primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+          <span>📖</span>
+          <span>خريطة الأثمان (480 ثمناً)</span>
+        </Link>
         <button
           type="button"
           className="btn btn--ghost"

@@ -40,15 +40,18 @@ export const LEVEL_THEME: Record<
 }
 
 interface Props {
-  userId: string
+  userId?: string
   onClose?: () => void
+  memberName?: string
 }
 
-export function QuranMemorizationGrid({ userId, onClose }: Props) {
+export function QuranMemorizationGrid({ userId, onClose, memberName }: Props) {
+  const effectiveUserId = userId || 'current_user'
+
   const [progress, setProgress] = useState<Record<number, MemorizationLevel>>(() => {
     // Initialisation depuis le stockage local (cache rapide)
     try {
-      const cached = localStorage.getItem(`quran_athman_${userId}`)
+      const cached = localStorage.getItem(`quran_athman_${effectiveUserId}`)
       return cached ? JSON.parse(cached) : {}
     } catch {
       return {}
@@ -68,6 +71,16 @@ export function QuranMemorizationGrid({ userId, onClose }: Props) {
     }),
   )
 
+  // Recharger le cache local si effectiveUserId change
+  useEffect(() => {
+    try {
+      const cached = localStorage.getItem(`quran_athman_${effectiveUserId}`)
+      setProgress(cached ? JSON.parse(cached) : {})
+    } catch {
+      setProgress({})
+    }
+  }, [effectiveUserId])
+
   // Chargement asynchrone des données depuis Supabase
   useEffect(() => {
     let cancelled = false
@@ -86,7 +99,7 @@ export function QuranMemorizationGrid({ userId, onClose }: Props) {
             map[row.thmoun_id] = row.level
           })
           setProgress(map)
-          localStorage.setItem(`quran_athman_${userId}`, JSON.stringify(map))
+          localStorage.setItem(`quran_athman_${effectiveUserId}`, JSON.stringify(map))
         }
       } catch (err) {
         // Fallback silencieux sur le stockage local si la table n'est pas encore migrée
@@ -98,7 +111,7 @@ export function QuranMemorizationGrid({ userId, onClose }: Props) {
     return () => {
       cancelled = true
     }
-  }, [userId])
+  }, [userId, effectiveUserId])
 
   // Statistiques calculées en temps réel
   const stats = useMemo(() => {
@@ -145,12 +158,13 @@ export function QuranMemorizationGrid({ userId, onClose }: Props) {
     const nextState = { ...progress, [thmounId]: level }
     setProgress(nextState)
     try {
-      localStorage.setItem(`quran_athman_${userId}`, JSON.stringify(nextState))
+      localStorage.setItem(`quran_athman_${effectiveUserId}`, JSON.stringify(nextState))
     } catch {
       // ignore
     }
 
-    // 2. Synchronisation Supabase
+    // 2. Synchronisation Supabase si userId est fourni
+    if (!userId) return
     try {
       if (level === 'none') {
         await supabase
@@ -183,7 +197,9 @@ export function QuranMemorizationGrid({ userId, onClose }: Props) {
         <div className="stats-main">
           <div className="stats-metric">
             <span className="stats-number">{stats.percentage}%</span>
-            <span className="stats-caption">نسبة الإتقان الإجمالية (480 ثمناً)</span>
+            <span className="stats-caption">
+              {memberName ? `سجل حفظ: ${memberName} (480 ثمناً)` : 'نسبة الإتقان الإجمالية (480 ثمناً)'}
+            </span>
             {onClose ? (
               <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>
                 إغلاق الخريطة

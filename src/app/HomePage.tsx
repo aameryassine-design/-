@@ -63,6 +63,14 @@ export function HomePage() {
         </div>
       </div>
 
+      <Link className="card home-card" to="/app/quran">
+        <div>
+          <h3 className="home-card__title">خريطة حفظ القرآن (480 ثمناً)</h3>
+          <p className="hint">متابعة الحفظ وتثبيت الأثمان بالتلوين التفاعلي</p>
+        </div>
+        <span aria-hidden="true" style={{ fontSize: '1.4rem' }}>📖</span>
+      </Link>
+
       {has('member') && member ? (
         <Link className="card home-card" to="/app/tasks">
           <div>

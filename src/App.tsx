@@ -65,6 +65,7 @@ export default function App() {
                 }
               />
 
+              <Route path="/quran" element={<Navigate to="/app/quran" replace />} />
               <Route path="*" element={<HomeRedirect />} />
             </Routes>
           </Suspense>

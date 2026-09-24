@@ -62,22 +62,13 @@ async function loadMine(memberId: string, period: Period): Promise<MyData> {
 export function MyProgressPage() {
   const { member, user } = useAuth()
   const [period, setPeriod] = useState<Period>(currentMonth)
-  const [activeTab, setActiveTab] = useState<'summary' | 'quran'>('summary')
+  const [activeTab, setActiveTab] = useState<'quran' | 'summary'>('quran')
   const memberId = member?.id ?? ''
 
   const state = useAsync(
     () => (memberId ? loadMine(memberId, period) : Promise.resolve(null as unknown as MyData)),
     [memberId, period.start, period.end],
   )
-
-  if (!member) {
-    return (
-      <EmptyState
-        title="حسابك غير مرتبط ببطاقة عضو"
-        hint="تواصل مع المشرف العام لربط بريدك الإلكتروني ببطاقتك."
-      />
-    )
-  }
 
   const entries = state.data?.entries ?? []
   const tasks = state.data?.tasks ?? []
@@ -98,7 +89,7 @@ export function MyProgressPage() {
         <h2 className="page-header__title">تقدّمي</h2>
         <p className="page-header__description">
           {activeTab === 'summary'
-            ? formatRange(period.start, period.end)
+            ? (member ? formatRange(period.start, period.end) : 'الملخص العام')
             : 'خريطة حفظ ومراجعة القرآن الكريم (480 ثمناً)'}
         </p>
       </div>
@@ -106,17 +97,17 @@ export function MyProgressPage() {
       <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
         <button
           type="button"
-          className={`btn btn--sm ${activeTab === 'summary' ? 'btn--primary' : 'btn--ghost'}`}
-          onClick={() => setActiveTab('summary')}
-        >
-          الملخص العام
-        </button>
-        <button
-          type="button"
           className={`btn btn--sm ${activeTab === 'quran' ? 'btn--primary' : 'btn--ghost'}`}
           onClick={() => setActiveTab('quran')}
         >
           خريطة الأثمان (480 ثمناً)
+        </button>
+        <button
+          type="button"
+          className={`btn btn--sm ${activeTab === 'summary' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => setActiveTab('summary')}
+        >
+          الملخص العام
         </button>
       </div>
 
@@ -124,6 +115,11 @@ export function MyProgressPage() {
         <QuranMemorizationGrid
           userId={user?.id ?? ''}
           onClose={() => setActiveTab('summary')}
+        />
+      ) : !member ? (
+        <EmptyState
+          title="حسابك غير مرتبط ببطاقة عضو"
+          hint="تواصل مع المشرف العام لربط بريدك الإلكتروني ببطاقتك."
         />
       ) : (
         <>

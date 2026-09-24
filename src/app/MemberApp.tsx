@@ -10,6 +10,7 @@ import { HomePage } from './HomePage'
 import { MemorizationOfficerPage } from './MemorizationOfficerPage'
 import { MyProgressPage } from './MyProgressPage'
 import { MyTasksPage } from './MyTasksPage'
+import { QuranPage } from './QuranPage'
 import { TasksOfficerPage } from './TasksOfficerPage'
 
 // Le lecteur PDF embarque pdf.js : il n'est téléchargé qu'à l'ouverture d'un livre.
@@ -27,6 +28,7 @@ interface Tab {
 
 const TABS: Tab[] = [
   { to: '/app', label: 'الرئيسية', icon: '⌂', roles: null, end: true },
+  { to: '/app/quran', label: 'المصحف', icon: '📖', roles: null },
   { to: '/app/tasks', label: 'واجباتي', icon: '✓', roles: ['member'] },
   { to: '/app/progress', label: 'تقدّمي', icon: '↗', roles: ['member'] },
   { to: '/app/books', label: 'الكتب', icon: '▤', roles: null },
@@ -73,6 +75,7 @@ export default function MemberApp() {
         <Suspense fallback={<Loading />}>
           <Routes>
             <Route index element={<HomePage />} />
+            <Route path="quran" element={<QuranPage />} />
             <Route
               path="tasks"
               element={

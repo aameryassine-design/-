@@ -1,5 +1,6 @@
 import { NavLink, Route, Routes } from 'react-router-dom'
 import { useAuth, useDisplayName } from '../auth/AuthProvider'
+import { AdminQuranPage } from './AdminQuranPage'
 import { BooksPage } from './BooksPage'
 import { DashboardPage } from './DashboardPage'
 import { MajalisPage } from './MajalisPage'
@@ -11,6 +12,7 @@ import { UsersPage } from './UsersPage'
 
 const NAV = [
   { to: '/admin', label: 'البيان', end: true },
+  { to: '/admin/quran', label: 'خريطة الأثمان' },
   { to: '/admin/members', label: 'الأعضاء' },
   { to: '/admin/majalis', label: 'المجالس' },
   { to: '/admin/attendance', label: 'الحضور الأسبوعي' },
@@ -67,6 +69,7 @@ export default function AdminApp() {
       <main className="app__main">
         <Routes>
           <Route index element={<DashboardPage />} />
+          <Route path="quran" element={<AdminQuranPage />} />
           <Route path="members" element={<MembersPage />} />
           <Route path="majalis" element={<MajalisPage />} />
           <Route path="attendance" element={<AttendancePage />} />
