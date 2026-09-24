@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { currentMonth, PeriodPicker, type Period } from '../components/PeriodPicker'
+import { QuranMemorizationGrid } from '../components/QuranMemorizationGrid'
 import { useAsync, unwrap } from '../hooks/useAsync'
 import { formatRange, formatShortDate } from '../lib/dates'
 import { formatPct, ratioTone } from '../lib/scoring'
@@ -59,8 +60,9 @@ async function loadMine(memberId: string, period: Period): Promise<MyData> {
 }
 
 export function MyProgressPage() {
-  const { member } = useAuth()
+  const { member, user } = useAuth()
   const [period, setPeriod] = useState<Period>(currentMonth)
+  const [activeTab, setActiveTab] = useState<'summary' | 'quran'>('summary')
   const memberId = member?.id ?? ''
 
   const state = useAsync(
@@ -94,20 +96,48 @@ export function MyProgressPage() {
     <section className="page">
       <div className="mobile-head">
         <h2 className="page-header__title">تقدّمي</h2>
-        <p className="page-header__description">{formatRange(period.start, period.end)}</p>
+        <p className="page-header__description">
+          {activeTab === 'summary'
+            ? formatRange(period.start, period.end)
+            : 'خريطة حفظ ومراجعة القرآن الكريم (480 ثمناً)'}
+        </p>
       </div>
 
-      <ErrorBanner message={state.error} />
-
-      <div className="card">
-        <PeriodPicker value={period} onChange={setPeriod} showQuarter />
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.25rem' }}>
+        <button
+          type="button"
+          className={`btn btn--sm ${activeTab === 'summary' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => setActiveTab('summary')}
+        >
+          الملخص العام
+        </button>
+        <button
+          type="button"
+          className={`btn btn--sm ${activeTab === 'quran' ? 'btn--primary' : 'btn--ghost'}`}
+          onClick={() => setActiveTab('quran')}
+        >
+          خريطة الأثمان (480 ثمناً)
+        </button>
       </div>
 
-      {state.loading ? <Loading /> : null}
-
-      {!state.loading && state.data ? (
+      {activeTab === 'quran' ? (
+        <QuranMemorizationGrid
+          userId={user?.id ?? ''}
+          onClose={() => setActiveTab('summary')}
+        />
+      ) : (
         <>
-          <div className="summary-grid">
+          <ErrorBanner message={state.error} />
+
+          <div className="card">
+            <PeriodPicker value={period} onChange={setPeriod} showQuarter />
+          </div>
+
+          {state.loading ? <Loading /> : null}
+
+          {!state.loading && state.data ? (
+            <>
+              <div className="summary-grid">
             <div className="card summary-card">
               <span className="summary-card__label">الواجبات التعبدية</span>
               <span className={`summary-card__value tone-${ratioTone(ratio(worship))}`}>
@@ -136,7 +166,16 @@ export function MyProgressPage() {
           </div>
 
           <div className="card">
-            <h3 className="card__title">برنامج الحفظ</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
+              <h3 className="card__title" style={{ margin: 0 }}>برنامج الحفظ</h3>
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => setActiveTab('quran')}
+              >
+                فتح خريطة الأثمان ↗
+              </button>
+            </div>
             {program ? (
               <ul className="detail-card__list">
                 <li>
@@ -193,8 +232,10 @@ export function MyProgressPage() {
               </ul>
             </div>
           ) : null}
+            </>
+          ) : null}
         </>
-      ) : null}
+      )}
     </section>
   )
 }
