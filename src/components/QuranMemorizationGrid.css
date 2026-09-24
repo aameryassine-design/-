@@ -1,0 +1,293 @@
+/* ==========================================================================
+   Styles pour le composant de suivi de mémorisation par Athman (480 blocs)
+   ========================================================================== */
+
+.quran-tracker {
+  max-width: 960px;
+  margin: 0 auto;
+  font-family: inherit;
+  color: #f1f5f9;
+}
+
+/* 1. Dashboard Statistiques & Progression */
+.quran-tracker__card {
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+}
+
+.stats-main {
+  margin-bottom: 1rem;
+}
+
+.stats-metric {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.stats-number {
+  font-size: 2.5rem;
+  font-weight: 800;
+  color: #10b981;
+  line-height: 1;
+}
+
+.stats-caption {
+  font-size: 0.95rem;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.progress-bar {
+  width: 100%;
+  height: 10px;
+  background: #0f172a;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: linear-gradient(90deg, #059669, #10b981);
+  transition: width 0.35s ease;
+}
+
+.stats-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.stat-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.85rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid #334155;
+  font-size: 0.825rem;
+}
+
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dot--mastered { background: #10b981; box-shadow: 0 0 6px #10b981; }
+.dot--medium { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+.dot--weak { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+
+/* 2. Sélecteur de Juz' (Scroll horizontal tactile) */
+.juz-selector {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.65rem;
+  margin-bottom: 1.25rem;
+  scrollbar-width: thin;
+}
+
+.juz-btn {
+  padding: 0.45rem 0.9rem;
+  border-radius: 0.75rem;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #94a3b8;
+  white-space: nowrap;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.juz-btn:hover {
+  background: #334155;
+  color: #ffffff;
+}
+
+.juz-btn--active {
+  background: #2563eb !important;
+  color: #ffffff !important;
+  border-color: #3b82f6 !important;
+  font-weight: 600;
+}
+
+/* 3. Grille des 60 Ahzab */
+.ahzab-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.85rem;
+}
+
+.hizb-card {
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--border-color, #334155);
+  border-radius: 0.85rem;
+  padding: 0.85rem 1rem;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.hizb-card:hover {
+  border-color: #475569;
+}
+
+.hizb-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.65rem;
+}
+
+.hizb-title {
+  font-weight: 700;
+  font-size: 0.925rem;
+  color: #e2e8f0;
+}
+
+.hizb-score {
+  font-size: 0.8rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Ligne des 8 cubes */
+.athman-row {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
+}
+
+.cube-btn {
+  aspect-ratio: 1;
+  border-radius: 5px;
+  border: 1px solid;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-family: inherit;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.cube-btn:hover {
+  transform: scale(1.15);
+  filter: brightness(1.2);
+  z-index: 5;
+}
+
+.cube-btn__idx {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* 4. Popover / Fenêtre contextuelle de sélection */
+.popover-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.popover-content {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  max-width: 420px;
+  width: 100%;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  text-align: center;
+  animation: popoverScaleIn 0.18s ease-out;
+}
+
+@keyframes popoverScaleIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.popover-header {
+  margin-bottom: 1.25rem;
+}
+
+.popover-tag {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  background: #1e293b;
+  color: #38bdf8;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.popover-snippet {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #f8fafc;
+  margin: 0.35rem 0;
+  line-height: 1.4;
+}
+
+.popover-surahs {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+.popover-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.level-choice-btn {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.15rem;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.level-choice-btn:hover {
+  filter: brightness(1.12);
+  transform: translateX(-3px);
+}
+
+.level-choice-btn--current {
+  box-shadow: 0 0 0 2px #ffffff;
+}
+
+.popover-close-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.4rem;
+  font-family: inherit;
+}
+
+.popover-close-btn:hover {
+  color: #f8fafc;
+}
