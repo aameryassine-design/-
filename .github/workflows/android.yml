@@ -13,21 +13,21 @@ on:
 
 jobs:
   apk:
+    # ubuntu-latest : prêt pour la bascule automatique vers Ubuntu 26 (octobre 2026).
+    # Le SDK Android et les outils CLI nécessaires sont préinstallés sur l'image runner.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
-
-      - uses: android-actions/setup-android@v3
 
       - run: npm ci
 

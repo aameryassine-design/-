@@ -35,9 +35,18 @@ export function LoginPage() {
       })
       if (failure) {
         setError(errorMessage(failure))
-      } else if (!data.session) {
-        setNotice('تم إنشاء الحساب. افتح بريدك الإلكتروني لتأكيده ثم عد لتسجيل الدخول.')
-        setMode('signin')
+      } else if (data.session) {
+        // Le compte est confirmé immédiatement et connecté : AuthProvider prend le relais et redirige.
+      } else {
+        // Si Supabase ne retourne pas immédiatement la session, tenter une connexion directe
+        const { error: signInFailure } = await supabase.auth.signInWithPassword({
+          email: trimmed,
+          password,
+        })
+        if (signInFailure) {
+          setNotice('تم إنشاء الحساب بنجاح. يمكنك الآن تسجيل الدخول مباشرة.')
+          setMode('signin')
+        }
       }
     }
 
