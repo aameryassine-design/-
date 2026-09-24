@@ -1,5 +1,6 @@
 import { useState, useOptimistic, useTransition, useMemo, useEffect } from 'react'
 import { ATHMAN_CATALOG, type ThmounMeta, type SurahSegment } from '../data/athmanCatalog'
+import { getSurahsForHizb } from '../data/quranSurahsMapping'
 import { supabase } from '../lib/supabase'
 import './QuranMemorizationGrid.css'
 
@@ -260,12 +261,44 @@ export function QuranMemorizationGrid({ userId, onClose, memberName }: Props) {
           const masteredInHizb = athman.filter(
             (t) => optimisticProgress[t.id] === 'mastered',
           ).length
+          const surahsInHizb = getSurahsForHizb(hizbNumber)
 
           return (
             <div key={hizbNumber} className="hizb-card">
               <div className="hizb-card__header">
                 <span className="hizb-title">الحزب {hizbNumber}</span>
                 <span className="hizb-score">{masteredInHizb} / 8</span>
+              </div>
+
+              {/* Ligne des Sourates (Superposition géométrique sur les 8 blocs) */}
+              <div className="sourates-track" aria-label={`سور الحزب ${hizbNumber}`}>
+                {surahsInHizb.map((span, idx) => {
+                  const flex = span.flexWeight ?? (span.endQuarter - span.startQuarter + 1)
+                  const isCompact = flex <= 1.2
+                  const hasCluster = span.clusterSurahs && span.clusterSurahs.length > 1
+
+                  const tooltip = hasCluster
+                    ? `السور: ${span.clusterSurahs!.map((s) => s.surahNameAr).join(' ، ')} (الثمن ${span.startQuarter})`
+                    : `سورة ${span.surahNameAr} ${span.ayahRangeAr ? `(آيات ${span.ayahRangeAr})` : ''} — [أثمان ${span.startQuarter === span.endQuarter ? span.startQuarter : `${span.startQuarter} إلى ${span.endQuarter}`}]`
+
+                  return (
+                    <div
+                      key={`${span.surahNumber}-${idx}`}
+                      className={`surah-indicator-bar ${isCompact ? 'surah-indicator-bar--compact' : ''}`}
+                      style={{ flex }}
+                      title={tooltip}
+                    >
+                      <span className="surah-indicator-label">
+                        {span.surahNameAr}
+                        {hasCluster && (
+                          <span className="surah-cluster-count">
+                            +{span.clusterSurahs!.length - 1}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  )
+                })}
               </div>
 
               {/* 8 Cubes interactifs */}

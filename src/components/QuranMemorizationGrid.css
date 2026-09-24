@@ -157,6 +157,69 @@
   font-weight: 600;
 }
 
+/* Ligne des Sourates (Superposition géométrique au-dessus des 8 Athman) */
+.sourates-track {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 7px;
+  align-items: center;
+  min-height: 24px;
+}
+
+.surah-indicator-bar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 5px;
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(56, 189, 248, 0.32);
+  border-top: 2px solid #38bdf8;
+  border-radius: 4px;
+  color: #7dd3fc;
+  font-size: 0.725rem;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+  user-select: none;
+  cursor: default;
+  transition: all 0.2s ease;
+  min-width: 0;
+}
+
+.surah-indicator-bar:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: #38bdf8;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(56, 189, 248, 0.35);
+  transform: translateY(-1px);
+}
+
+.surah-indicator-bar--compact {
+  font-size: 0.65rem;
+  padding: 0 2px;
+}
+
+.surah-indicator-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.surah-cluster-count {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 800;
+  background: #0284c7;
+  color: #ffffff;
+  padding: 0 4px;
+  border-radius: 999px;
+  margin-right: 3px;
+  line-height: 1.4;
+}
+
 /* Ligne des 8 cubes */
 .athman-row {
   display: grid;
