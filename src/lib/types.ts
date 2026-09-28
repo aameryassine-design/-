@@ -4,7 +4,9 @@
 
 /** Identifiants ASCII : ils ne servent qu'à brancher du code. Libellés arabes dans roles.ts. */
 export type AppRole =
+  | 'super_admin'
   | 'supervisor'
+  | 'majlis_admin'
   | 'tasks_officer'
   | 'memorization_officer'
   | 'majlis_leader'
@@ -39,6 +41,7 @@ export interface Profile {
 export interface UserRoleRow {
   user_id: string
   role: AppRole
+  majlis_id?: string | null
   granted_at: string
 }
 
@@ -106,8 +109,9 @@ export interface IndividualTask {
   id: string
   title: string
   kind: TaskKind
-  /** null = tâche collective, valable pour tous les membres actifs. */
+  /** null = tâche collective, valable pour tous les membres actifs du majlis. */
   member_id: string | null
+  majlis_id?: string | null
   book_program_id: string | null
   starts_on: string
   ends_on: string | null

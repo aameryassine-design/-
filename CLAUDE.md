@@ -32,24 +32,27 @@ Une seule base de code sert deux usages :
 
 Les deux parties sont chargées en lazy loading : l'APK d'un simple membre ne télécharge jamais le code d'administration.
 
-## 3. Rôles et règles métier (décisions validées)
+## 3. Rôles et règles métier (décisions validées) — Architecture Multi-Tenant (SaaS)
 
-| Rôle | Où | Droits |
-|---|---|---|
-| مشرف عام (`supervisor`) | Site | Gère membres, majalis, livres, rôles. Saisit les 3 feuilles v1 (présence hebdo, تحضير, حفظ النصوص). Voit **tout** le bilan, y compris le détail des واجبات. |
-| مسؤول الواجبات الفردية | APK | Crée les tâches. Ne voit **que** « أجاب / لم يجب » par membre et par jour. |
-| مسؤول الحفظ | APK | Crée le programme de mémorisation de chaque membre, ajoute les أثمان. |
-| مسؤول المجلس الداخلي (plusieurs) | APK | Note la présence des membres de **son** majlis uniquement. |
-| عضو (`member`) | APK | Renseigne ses واجبات, coche son ورد, lit les livres PDF, voit sa progression. |
+L'application repose sur une **architecture multi-tenant (Multi-Majalis) hermétique**, où l'isolation stricte des données entre les différents Majalis est garantie directement au niveau de la base de données par les **Row Level Security (RLS)** de PostgreSQL / Supabase.
 
-Règles :
+### Hiérarchie des rôles
 
-- **الواجبات الفردية** : saisie quotidienne, une entrée par tâche et par jour. Trois états : أنجزت / لم أنجز / pas de ligne = لم يجب. Rattrapage des jours passés **illimité** (choix assumé) ; saisie dans le futur et avant la création de la tâche refusées.
-- **Confidentialité** : le مسؤول الواجبات voit « أجاب » si le membre a renseigné **au moins une** tâche ce jour-là, sinon « لم يجب ». Aucun compteur, aucun détail, aucun statut. Cette règle est garantie **en base**, pas dans l'interface : il lit uniquement la vue `daily_participation` (member_id, entry_date, has_responded) et la RLS lui interdit la table brute. **Ne jamais passer cette vue en `security_invoker`**, même si l'advisor Supabase le suggère : c'est ce qui la fait fonctionner.
-- **قراءة الكتب** : le superviseur seul téléverse le PDF (Supabase Storage) et programme un livre avec un ورد en pages par jour. La programmation crée automatiquement une tâche « قراءة ورد القراءة » dans les واجبات (même modèle à 3 états). PDF lisible et téléchargeable dans l'APK.
-- **برنامج الحفظ** : programme différent par membre (« المفصل », « من سورة البقرة »…). Seul le مسؤول الحفظ ajoute les أثمان, le membre ne s'auto-valide pas.
-- **المجلس الداخلي** : un membre appartient à un seul majlis. Le responsable note حاضر / غائب / معذور.
-- **Comptes** : tout nouvel inscrit obtient automatiquement le rôle `member` et une fiche `members` lui est créée automatiquement (ou rattachée si déjà créée par le superviseur). Le superviseur peut ensuite ajuster son rôle (responsable, etc.) et l'affecter à un majlis depuis l'écran الحسابات.
+| Rôle | Identifiant ASCII | Où | Droits & Périmètre Multi-Tenant |
+|---|---|---|---|
+| **مشرف عام** | `super_admin` / `supervisor` | Site (`/admin/*`) | **Super Administrateur Global** : Accès complet (CRUD) à l'ensemble des Majalis, membres, séances, tâches et bilans. Dispose d'un filtre global (sélecteur de Majlis ou vue d'ensemble) sur le tableau de bord. |
+| **مشرف المجلس** | `majlis_admin` | Site (`/admin/*`) & APK | **Administrateur Local de Majlis** : Gère les membres, séances, présences, mémorisation et consulte les rapports **exclusivement** pour son propre Majlis (`majlis_id`). Ne peut en aucun cas lire ou modifier les données d'un autre Majlis. |
+| **مسؤول الواجبات الفردية** | `tasks_officer` | APK (`/app/*`) | Crée et gère les devoirs pour son Majlis. Ne voit **que** « أجاب / لم يجب » des membres de son Majlis via la vue `daily_participation`. |
+| **مسؤول الحفظ** | `memorization_officer` | APK (`/app/*`) | Crée les programmes de mémorisation et valide les أثمان **exclusivement** pour les membres de son Majlis. |
+| **مسؤول المجلس الداخلي** | `majlis_leader` | APK (`/app/*`) | Note la présence aux séances de conseil interne pour les membres de son Majlis uniquement. |
+| **عضو** | `member` | APK (`/app/*`) | Renseigne ses واجبات, coche son ورد, lit les livres PDF, et consulte ses propres données et celles de son propre Majlis. |
+
+### Règles d'isolation Multi-Tenant (RLS Supabase) :
+
+- **Étanchéité totale (Tenant Isolation)** : L'isolation est garantie par les RLS de Supabase (PostgreSQL) et les fonctions utilitaires du schéma privé `app` (`app.current_user_majlis_ids()`, `app.is_super_admin()`, `app.is_majlis_admin()`, etc.). Même en cas de manipulation directe des requêtes réseau par un utilisateur, la base de données bloque toute tentative de lecture ou d'écriture croisée entre Majalis.
+- **Rattachement et Scoping des rôles** : La table `user_roles` supporte désormais un attribut `majlis_id`. Les rôles de responsables (`majlis_admin`, `tasks_officer`, `memorization_officer`, `majlis_leader`) sont scopés au Majlis de l'utilisateur (via `user_roles.majlis_id` ou la fiche `members.majlis_id`). Seul le `super_admin` possède une portée globale (`majlis_id IS NULL`).
+- **Tâches collectives scopées** : La table `individual_tasks` dispose d'un `majlis_id` pour que les tâches collectives d'un Majlis ne polluent pas les autres Majalis.
+- **Vue daily_participation filtrée** : La vue `daily_participation` filtre strictement les membres par le `majlis_id` du responsable connecté, interdisant toute fuite d'information transversale.
 
 ## 4. Stack et infrastructure
 

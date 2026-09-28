@@ -25,6 +25,9 @@ interface AuthState {
   profile: Profile | null
   roles: AppRole[]
   member: MemberLink | null
+  majlisId: string | null
+  isSuperAdmin: boolean
+  isMajlisAdmin: boolean
   /** Vrai tant qu'on ne sait pas encore qui est connecté. */
   loading: boolean
   error: string | null
@@ -40,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [roles, setRoles] = useState<AppRole[]>([])
   const [member, setMember] = useState<MemberLink | null>(null)
+  const [majlisId, setMajlisId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -50,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const [profileResult, rolesResult, memberResult] = await Promise.all([
         supabase.from('profiles').select('id, full_name, phone').eq('id', userId).maybeSingle(),
-        supabase.from('user_roles').select('role').eq('user_id', userId),
+        supabase.from('user_roles').select('role, majlis_id').eq('user_id', userId),
         supabase
           .from('members')
           .select('id, full_name, majlis_id')
@@ -61,14 +65,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const failure = profileResult.error ?? rolesResult.error ?? memberResult.error
       if (failure) throw failure
 
+      const grants = (rolesResult.data ?? []) as { role: AppRole; majlis_id?: string | null }[]
+      const memberData = memberResult.data as MemberLink | null
+      const explicitMajlis = grants.find((r) => r.majlis_id)?.majlis_id ?? memberData?.majlis_id ?? null
+
       setProfile((profileResult.data as Profile | null) ?? null)
-      setRoles(((rolesResult.data ?? []) as { role: AppRole }[]).map((row) => row.role))
-      setMember((memberResult.data as MemberLink | null) ?? null)
+      setRoles(grants.map((row) => row.role))
+      setMember(memberData)
+      setMajlisId(explicitMajlis)
       setError(null)
     } catch (caught) {
       setError(errorMessage(caught))
       setRoles([])
       setMember(null)
+      setMajlisId(null)
     }
   }, [])
 
@@ -121,21 +131,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut()
   }, [])
 
-  const value = useMemo<AuthState>(
-    () => ({
+  const value = useMemo<AuthState>(() => {
+    const isSuperAdmin = roles.includes('super_admin') || roles.includes('supervisor')
+    const isMajlisAdmin = roles.includes('majlis_admin')
+
+    const has = (...wanted: AppRole[]) =>
+      wanted.some((role) => {
+        if ((role === 'supervisor' || role === 'super_admin') && isSuperAdmin) return true
+        return roles.includes(role)
+      })
+
+    return {
       session,
       user: session?.user ?? null,
       profile,
       roles,
       member,
+      majlisId,
+      isSuperAdmin,
+      isMajlisAdmin,
       loading,
       error,
-      has: (...wanted: AppRole[]) => wanted.some((role) => roles.includes(role)),
+      has,
       reload,
       signOut,
-    }),
-    [session, profile, roles, member, loading, error, reload, signOut],
-  )
+    }
+  }, [session, profile, roles, member, majlisId, loading, error, reload, signOut])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

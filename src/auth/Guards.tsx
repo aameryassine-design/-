@@ -83,12 +83,12 @@ export function RequireRole({
   )
 }
 
-/** Aiguillage de la racine : le site pour le مشرف عام, l'app pour les autres. */
+/** Aiguillage de la racine : le site pour les administrateurs (général ou de مجلس), l'app pour les autres. */
 export function HomeRedirect() {
   const { loading, session, roles, has } = useAuth()
 
   if (loading) return <Loading label="جارٍ التحقق…" />
   if (!session) return <Navigate to="/login" replace />
   if (roles.length === 0) return <PendingPage />
-  return <Navigate to={has('supervisor') ? '/admin' : '/app'} replace />
+  return <Navigate to={has('supervisor', 'super_admin', 'majlis_admin') ? '/admin' : '/app'} replace />
 }

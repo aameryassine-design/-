@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../auth/AuthProvider'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { useToast } from '../components/Toast'
 import { useAsync, unwrap } from '../hooks/useAsync'
@@ -51,6 +52,7 @@ function daysBetween(start: string, end: string): string[] {
 
 export function TasksOfficerPage() {
   const toast = useToast()
+  const { majlisId } = useAuth()
   const { members } = useMembers()
   const today = todayISO()
 
@@ -73,9 +75,13 @@ export function TasksOfficerPage() {
   const addTask = async () => {
     if (!title.trim()) return
     setBusy(true)
+
+    const targetMember = scope ? members.find((m) => m.id === scope) : null
+    const taskMajlisId = targetMember?.majlis_id ?? majlisId
+
     const { error } = await supabase
       .from('individual_tasks')
-      .insert({ title: title.trim(), member_id: scope || null })
+      .insert({ title: title.trim(), member_id: scope || null, majlis_id: taskMajlisId })
     setBusy(false)
     if (error) {
       toast(errorMessage(error), 'error')

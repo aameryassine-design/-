@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../auth/AuthProvider'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
@@ -53,12 +54,19 @@ export function TasksDetailPage() {
   const appliesTo = (task: IndividualTask, memberId: string) =>
     task.member_id === null || task.member_id === memberId
 
+  const { isSuperAdmin, majlisId } = useAuth()
+
   const addTask = async () => {
     if (!title.trim()) return
     setBusy(true)
+
+    const targetMember = scope ? members.find((m) => m.id === scope) : null
+    const taskMajlisId = targetMember?.majlis_id ?? (isSuperAdmin ? null : majlisId)
+
     const { error } = await supabase.from('individual_tasks').insert({
       title: title.trim(),
       member_id: scope || null,
+      majlis_id: taskMajlisId,
       starts_on: date,
     })
     setBusy(false)

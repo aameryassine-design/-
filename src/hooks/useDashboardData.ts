@@ -70,16 +70,24 @@ async function selectAll<T>(table: string, columns = '*'): Promise<T[]> {
   return (data ?? []) as T[]
 }
 
-async function load(period: Period): Promise<DashboardResult> {
+async function load(period: Period, majlisId?: string | null): Promise<DashboardResult> {
   // 1. Les séances de la période, pour séparer الحضور الأسبوعي du المجلس الداخلي.
-  const { data: sessionData, error: sessionError } = await supabase
+  let sessionQuery = supabase
     .from('sessions')
-    .select('id, type, session_date')
+    .select('id, type, session_date, majlis_id')
     .gte('session_date', period.start)
     .lte('session_date', period.end)
+
+  if (majlisId) {
+    sessionQuery = sessionQuery.eq('majlis_id', majlisId)
+  }
+
+  const { data: sessionData, error: sessionError } = await sessionQuery
   if (sessionError) throw sessionError
 
-  const sessions = (sessionData ?? []) as Pick<Session, 'id' | 'type' | 'session_date'>[]
+  const sessions = (sessionData ?? []) as (Pick<Session, 'id' | 'type' | 'session_date'> & {
+    majlis_id?: string | null
+  })[]
   const councilIds = sessions.filter((s) => s.type === 'مجلس داخلي').map((s) => s.id)
   const weeklyIds = sessions.filter((s) => s.type !== 'مجلس داخلي').map((s) => s.id)
   const councilSet = new Set(councilIds)
@@ -90,10 +98,15 @@ async function load(period: Period): Promise<DashboardResult> {
     selectIn<MemorizationTextRecord>('memorization_texts', 'session_id', weeklyIds),
   ])
 
-  // 2. Les واجبات فردية : le مشرف عام voit le détail complet des saisies.
+  // 2. Les واجبات فردية : le superviseur ou majlis_admin voit les saisies autorisées.
+  let taskQuery = supabase.from('individual_tasks').select('*')
+  if (majlisId) {
+    taskQuery = taskQuery.or(`majlis_id.eq.${majlisId},majlis_id.is.null`)
+  }
+
   const [taskResult, entryResult, programResult, memoEntryResult, progressResult, bookResult] =
     await Promise.all([
-      supabase.from('individual_tasks').select('*'),
+      taskQuery,
       supabase
         .from('task_entries')
         .select('*')
@@ -207,6 +220,6 @@ async function load(period: Period): Promise<DashboardResult> {
   }
 }
 
-export function useDashboardData(period: Period) {
-  return useAsync(() => load(period), [period.start, period.end])
+export function useDashboardData(period: Period, majlisId?: string | null) {
+  return useAsync(() => load(period, majlisId), [period.start, period.end, majlisId])
 }

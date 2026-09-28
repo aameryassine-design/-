@@ -25,8 +25,15 @@ const NAV = [
 ]
 
 export default function AdminApp() {
-  const { has, signOut } = useAuth()
+  const { has, isSuperAdmin, isMajlisAdmin, signOut } = useAuth()
   const name = useDisplayName()
+
+  const roleTitle = isSuperAdmin ? 'المشرف العام' : isMajlisAdmin ? 'مشرف المجلس' : 'الإدارة'
+
+  const navItems = NAV.filter((item) => {
+    if (item.to === '/admin/majalis' && !isSuperAdmin) return false
+    return true
+  })
 
   return (
     <div className="app">
@@ -37,7 +44,7 @@ export default function AdminApp() {
           </span>
           <div>
             <h1 className="app__title">متابعة الحلقة</h1>
-            <p className="app__subtitle">لوحة المشرف العام — {name}</p>
+            <p className="app__subtitle">لوحة {roleTitle} — {name}</p>
           </div>
         </div>
 
@@ -54,7 +61,7 @@ export default function AdminApp() {
       </header>
 
       <nav className="app__nav" aria-label="التنقل بين الصفحات">
-        {NAV.map((item) => (
+        {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

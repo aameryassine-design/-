@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useAuth } from '../auth/AuthProvider'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
 import { currentMonth, PeriodPicker, type Period } from '../components/PeriodPicker'
+import { useAsync, unwrap } from '../hooks/useAsync'
 import {
   emptyScores,
   emptyTallies,
@@ -12,13 +14,31 @@ import { useMembers } from '../hooks/useMembers'
 import { INDICATORS, TALLIES } from '../lib/constants'
 import { formatRange, formatShortDate } from '../lib/dates'
 import { average, bucketRatio, formatPct, ratioTone } from '../lib/scoring'
+import { supabase } from '../lib/supabase'
+import type { Majlis } from '../lib/types'
 
 export function DashboardPage() {
-  const { members, loading: membersLoading, error: membersError } = useMembers()
+  const { isSuperAdmin, majlisId } = useAuth()
+  const [selectedMajlis, setSelectedMajlis] = useState('')
   const [period, setPeriod] = useState<Period>(currentMonth)
   const [selectedMember, setSelectedMember] = useState('')
 
-  const { data, loading, error, refresh } = useDashboardData(period)
+  // Pour le super_admin, on permet de choisir un majlis ou de voir le global.
+  // Pour le majlis_admin, son majlis_id s'applique automatiquement.
+  const activeMajlisId = isSuperAdmin ? (selectedMajlis || null) : majlisId
+
+  const majalisAsync = useAsync(
+    async () => {
+      if (!isSuperAdmin) return []
+      return unwrap<Pick<Majlis, 'id' | 'name'>[]>(
+        await supabase.from('majalis').select('id, name').order('name'),
+      )
+    },
+    [isSuperAdmin],
+  )
+
+  const { members, loading: membersLoading, error: membersError } = useMembers(false, activeMajlisId)
+  const { data, loading, error, refresh } = useDashboardData(period, activeMajlisId)
 
   const scoresOf = (memberId: string): MemberScores => data?.scores[memberId] ?? emptyScores()
   const talliesOf = (memberId: string) => data?.tallies[memberId] ?? emptyTallies()
@@ -89,7 +109,44 @@ export function DashboardPage() {
         </button>
       </PageHeader>
 
-      <ErrorBanner message={membersError ?? error} />
+      <ErrorBanner message={membersError ?? error ?? majalisAsync.error} />
+
+      {isSuperAdmin ? (
+        <div className="card majlis-filter-card" style={{ marginBottom: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.8rem' }}>
+            <label className="inline-field" style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+              <span className="label" style={{ fontWeight: 600 }}>المجلس:</span>
+              <select
+                className="input"
+                value={selectedMajlis}
+                onChange={(event) => {
+                  setSelectedMajlis(event.target.value)
+                  setSelectedMember('')
+                }}
+                style={{ minWidth: '220px' }}
+              >
+                <option value="">جميع المجالس (ملخص عام)</option>
+                {(majalisAsync.data ?? []).map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="sheet-toolbar__stats" style={{ margin: 0 }}>
+              {selectedMajlis ? (
+                <span className="pill pill--good">
+                  {members.length} أعضاء في هذا المجلس
+                </span>
+              ) : (
+                <span className="pill pill--neutral">
+                  إجمالي المنظومة: {members.length} أعضاء
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div className="card">
         <PeriodPicker value={period} onChange={setPeriod} showQuarter />

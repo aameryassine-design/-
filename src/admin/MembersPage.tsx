@@ -5,6 +5,7 @@ import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../components/Toast'
 import { useAsync, unwrap } from '../hooks/useAsync'
 import { useMembers } from '../hooks/useMembers'
+import { useAuth } from '../auth/AuthProvider'
 import { errorMessage, supabase } from '../lib/supabase'
 import type { Majlis, Member } from '../lib/types'
 
@@ -18,19 +19,20 @@ interface Draft {
 
 const EMPTY_DRAFT: Draft = { full_name: '', phone: '', email: '', note: '', majlis_id: '' }
 
-function toPayload(draft: Draft) {
+function toPayload(draft: Draft, defaultMajlisId?: string | null, isSuper = false) {
   return {
     full_name: draft.full_name.trim(),
     phone: draft.phone.trim() || null,
     email: draft.email.trim().toLowerCase() || null,
     note: draft.note.trim() || null,
-    majlis_id: draft.majlis_id || null,
+    majlis_id: isSuper ? (draft.majlis_id || null) : (defaultMajlisId || null),
   }
 }
 
 export function MembersPage() {
   const toast = useToast()
-  const { members, loading, error, refresh } = useMembers(true)
+  const { isSuperAdmin, majlisId } = useAuth()
+  const { members, loading, error, refresh } = useMembers(true, isSuperAdmin ? null : majlisId)
   const majalis = useAsync(
     async () => unwrap<Majlis[]>(await supabase.from('majalis').select('*').order('name')),
     [],
@@ -53,7 +55,9 @@ export function MembersPage() {
   const add = async () => {
     if (!draft.full_name.trim()) return
     setBusy(true)
-    const { error: insertError } = await supabase.from('members').insert(toPayload(draft))
+    const { error: insertError } = await supabase
+      .from('members')
+      .insert(toPayload(draft, majlisId, isSuperAdmin))
     setBusy(false)
     if (insertError) {
       toast(errorMessage(insertError), 'error')
@@ -68,7 +72,7 @@ export function MembersPage() {
     if (!editDraft.full_name.trim()) return
     const { error: updateError } = await supabase
       .from('members')
-      .update(toPayload(editDraft))
+      .update(toPayload(editDraft, majlisId, isSuperAdmin))
       .eq('id', id)
 
     if (updateError) {
@@ -175,7 +179,9 @@ export function MembersPage() {
         </label>
         <label>
           <span className="label">المجلس</span>
-          {majlisSelect(draft.majlis_id, (majlis_id) => setDraft({ ...draft, majlis_id }))}
+          {isSuperAdmin
+            ? majlisSelect(draft.majlis_id, (majlis_id) => setDraft({ ...draft, majlis_id }))
+            : <input className="input" disabled value={majlisName(majlisId)} />}
         </label>
         <button type="submit" className="btn btn--primary" disabled={busy}>
           {busy ? 'جارٍ الإضافة…' : '+ إضافة عضو'}
@@ -263,7 +269,7 @@ export function MembersPage() {
                       )}
                     </td>
                     <td>
-                      {editing
+                      {editing && isSuperAdmin
                         ? majlisSelect(editDraft.majlis_id, (majlis_id) =>
                             setEditDraft({ ...editDraft, majlis_id }),
                           )
