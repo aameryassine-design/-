@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
+import { QuranMemorizationGrid } from '../components/QuranMemorizationGrid'
 import { useToast } from '../components/Toast'
 import { useAsync, unwrap } from '../hooks/useAsync'
 import { useMembers } from '../hooks/useMembers'
@@ -35,6 +35,7 @@ export function MemorizationOfficerPage() {
   const board = useAsync(loadBoard, [])
 
   const [openId, setOpenId] = useState<string | null>(null)
+  const [expandedGridMemberId, setExpandedGridMemberId] = useState<string | null>(null)
   const [position, setPosition] = useState('')
   const [busy, setBusy] = useState(false)
 
@@ -95,13 +96,6 @@ export function MemorizationOfficerPage() {
         <p className="page-header__description">سجّل ثمناً كلما أتمّ العضو مقرّره.</p>
       </div>
 
-      <div style={{ marginBottom: '1rem' }}>
-        <Link to="/app/quran" className="btn btn--primary btn--sm" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-          <span>📖</span>
-          <span>الانتقال إلى خريطة الأثمان (480 ثمناً)</span>
-        </Link>
-      </div>
-
       <ErrorBanner message={board.error} />
 
       {board.loading ? <Loading /> : null}
@@ -113,7 +107,10 @@ export function MemorizationOfficerPage() {
       <div className="task-list">
         {programs.map((program) => {
           const open = openId === program.program_id
+          const isGridOpen = expandedGridMemberId === program.member_id
           const history = entriesOf(program.program_id)
+          const targetMember = members.find((m) => m.id === program.member_id)
+          const targetUserId = targetMember?.user_id || targetMember?.id || program.member_id
 
           return (
             <article key={program.program_id} className="card">
@@ -163,7 +160,7 @@ export function MemorizationOfficerPage() {
                   </div>
                 </div>
               ) : (
-                <div className="row-actions">
+                <div className="row-actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button
                     type="button"
                     className="btn btn--primary btn--sm"
@@ -171,8 +168,27 @@ export function MemorizationOfficerPage() {
                   >
                     + ثمن
                   </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() =>
+                      setExpandedGridMemberId(isGridOpen ? null : program.member_id)
+                    }
+                  >
+                    {isGridOpen ? 'إخفاء الخريطة' : '🗺️ خريطة الأثمان'}
+                  </button>
                 </div>
               )}
+
+              {isGridOpen ? (
+                <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>
+                  <QuranMemorizationGrid
+                    key={targetUserId}
+                    userId={targetUserId}
+                    memberName={memberName(program.member_id)}
+                  />
+                </div>
+              ) : null}
 
               {history.length > 0 ? (
                 <ul className="detail-card__list">

@@ -2,7 +2,7 @@ import type { AppRole } from './types'
 
 /** Libellé arabe affiché pour chaque rôle. */
 export const ROLE_LABELS: Record<AppRole, string> = {
-  super_admin: 'مشرف عام',
+  super_admin: 'مشرف عام (شامل)',
   supervisor: 'مشرف عام',
   majlis_admin: 'مشرف المجلس',
   tasks_officer: 'مسؤول الواجبات الفردية',
@@ -12,7 +12,7 @@ export const ROLE_LABELS: Record<AppRole, string> = {
 }
 
 export const ROLE_HINTS: Record<AppRole, string> = {
-  super_admin: 'مشرف عام على جميع المجالس، يدير المنظومة بالكامل ويطّلع على جميع البيانات.',
+  super_admin: 'مشرف عام على جميع المجالس، يدير المنظومة بالكامل ويمنح أي دور ويطّلع على جميع البيانات.',
   supervisor: 'مشرف عام على جميع المجالس، يدير المنظومة بالكامل ويطّلع على جميع البيانات.',
   majlis_admin: 'مشرف على مجلسه الخاص فقط: يدير الأعضاء والحضور والتحضير والحفظ وبيان المجلس.',
   tasks_officer: 'ينشئ الواجبات ويتابع من أجاب ومن لم يجب في مجلسه، دون الاطّلاع على الأجوبة.',
@@ -31,9 +31,9 @@ export const ALL_ROLES: readonly AppRole[] = [
   'member',
 ]
 
-/** Rôles affichés dans l'interface de gestion des comptes (évite le doublon super_admin / supervisor) */
+/** Rôles modifiables dans l'interface de gestion des comptes */
 export const ASSIGNABLE_ROLES: readonly AppRole[] = [
-  'supervisor',
+  'super_admin',
   'majlis_admin',
   'tasks_officer',
   'memorization_officer',

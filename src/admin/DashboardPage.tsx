@@ -2,7 +2,10 @@ import { useMemo, useState } from 'react'
 import { useAuth } from '../auth/AuthProvider'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
+import { PendingRequestsCard } from '../components/PendingRequestsCard'
 import { currentMonth, PeriodPicker, type Period } from '../components/PeriodPicker'
+import { useToast } from '../components/Toast'
+import { useAppSettings } from '../hooks/useAppSettings'
 import { useAsync, unwrap } from '../hooks/useAsync'
 import {
   emptyScores,
@@ -18,7 +21,9 @@ import { supabase } from '../lib/supabase'
 import type { Majlis } from '../lib/types'
 
 export function DashboardPage() {
+  const toast = useToast()
   const { isSuperAdmin, majlisId } = useAuth()
+  const { settings, loading: settingsLoading, updating: settingsUpdating, setAutoApprove } = useAppSettings()
   const [selectedMajlis, setSelectedMajlis] = useState('')
   const [period, setPeriod] = useState<Period>(currentMonth)
   const [selectedMember, setSelectedMember] = useState('')
@@ -110,6 +115,61 @@ export function DashboardPage() {
       </PageHeader>
 
       <ErrorBanner message={membersError ?? error ?? majalisAsync.error} />
+
+      {isSuperAdmin ? (
+        <div
+          className="card"
+          style={{
+            marginBottom: '1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            background: 'var(--surface)',
+            border: '1px solid var(--border)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <span style={{ fontSize: '1.4rem' }}>⚙️</span>
+            <div>
+              <h4 style={{ margin: 0, fontWeight: 600, fontSize: '15px' }}>
+                الموافقة التلقائية على الأعضاء الجدد (Auto-Approve Members)
+              </h4>
+              <p className="card__hint" style={{ margin: '2px 0 0 0', fontSize: '13px' }}>
+                {settings?.auto_approve_members
+                  ? 'مفعلة: يحصل العضو الجديد على دور «عضو» فور تسجيل حسابه تلقائياً.'
+                  : 'معطلة: يدخل العضو الجديد في قائمة الانتظار بدون دور حتى يتم تفعيله يدوياً من صفحة الحسابات.'}
+              </p>
+            </div>
+          </div>
+          <label className="toggle-switch" title="تبديل الموافقة التلقائية">
+            <input
+              type="checkbox"
+              checked={settings?.auto_approve_members ?? true}
+              disabled={settingsLoading || settingsUpdating}
+              onChange={async (e) => {
+                const nextVal = e.target.checked
+                const ok = await setAutoApprove(nextVal)
+                if (ok) {
+                  toast(
+                    nextVal
+                      ? 'تم تفعيل الموافقة التلقائية على الأعضاء الجدد'
+                      : 'تم تعطيل الموافقة التلقائية — الحسابات الجديدة ستكون معلقة في الانتظار',
+                    'ok',
+                  )
+                }
+              }}
+            />
+            <span className="toggle-slider" />
+          </label>
+        </div>
+      ) : null}
+
+      <PendingRequestsCard
+        majlisId={activeMajlisId}
+        onUpdated={() => void refresh()}
+      />
 
       {isSuperAdmin ? (
         <div className="card majlis-filter-card" style={{ marginBottom: '1rem' }}>

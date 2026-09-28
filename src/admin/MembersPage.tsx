@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
+import { PendingRequestsCard } from '../components/PendingRequestsCard'
 import { useToast } from '../components/Toast'
 import { useAsync, unwrap } from '../hooks/useAsync'
 import { useMembers } from '../hooks/useMembers'
@@ -139,6 +140,11 @@ export function MembersPage() {
       />
 
       <ErrorBanner message={error ?? majalis.error} />
+
+      <PendingRequestsCard
+        majlisId={isSuperAdmin ? null : majlisId}
+        onUpdated={() => void refresh()}
+      />
 
       <form
         className="card member-form"

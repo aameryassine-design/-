@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../components/Toast'
+import { useAppSettings } from '../hooks/useAppSettings'
 import { useAsync, unwrap } from '../hooks/useAsync'
 import { ASSIGNABLE_ROLES, ROLE_HINTS, roleLabel } from '../lib/roles'
 import { errorMessage, supabase } from '../lib/supabase'
@@ -32,6 +33,7 @@ async function loadAccounts(): Promise<Account[]> {
 
 export function UsersPage() {
   const toast = useToast()
+  const { settings, loading: settingsLoading, updating: settingsUpdating, setAutoApprove } = useAppSettings()
   const accounts = useAsync(loadAccounts, [])
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -87,7 +89,7 @@ export function UsersPage() {
     <section className="page">
       <PageHeader
         title="الحسابات والأدوار"
-        description="كل من يسجّل ببريد مطابق لبطاقة عضو يصير «عضواً» تلقائياً. أدوار المسؤولين تُمنح من هنا."
+        description="صلاحيات مطلقة للمشرف العام: يمكنك إسناد أي دور لأي مستخدم (بما في ذلك الترقية لمشرف عام)، والتحكم في تفعيل الحسابات المعلقة."
       >
         <button
           type="button"
@@ -100,6 +102,53 @@ export function UsersPage() {
       </PageHeader>
 
       <ErrorBanner message={accounts.error} />
+
+      {/* Auto-Approval Setting Toggle */}
+      <div
+        className="card"
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '1rem',
+          flexWrap: 'wrap',
+          marginBottom: '1rem',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span style={{ fontSize: '1.4rem' }}>⚙️</span>
+          <div>
+            <h4 style={{ margin: 0, fontWeight: 600, fontSize: '15px' }}>
+              الموافقة التلقائية على انضمام الأعضاء الجدد
+            </h4>
+            <p className="card__hint" style={{ margin: '2px 0 0 0', fontSize: '13px' }}>
+              {settings?.auto_approve_members
+                ? 'مفعل: يحصل العضو الجديد على دور «عضو» تلقائياً فور تسجيل حسابه.'
+                : 'معطل: يبقى الحساب الجديد معلقاً بدون أي دور في انتظار تفعيله يدوياً أدناه.'}
+            </p>
+          </div>
+        </div>
+        <label className="toggle-switch" title="تبديل الموافقة التلقائية">
+          <input
+            type="checkbox"
+            checked={settings?.auto_approve_members ?? true}
+            disabled={settingsLoading || settingsUpdating}
+            onChange={async (e) => {
+              const nextVal = e.target.checked
+              const ok = await setAutoApprove(nextVal)
+              if (ok) {
+                toast(
+                  nextVal
+                    ? 'تم تفعيل الموافقة التلقائية على الأعضاء الجدد'
+                    : 'تم تعطيل الموافقة التلقائية — الحسابات الجديدة ستكون في الانتظار',
+                  'ok',
+                )
+              }
+            }}
+          />
+          <span className="toggle-slider" />
+        </label>
+      </div>
 
       <div className="card">
         <h3 className="card__title">أدوار المنظومة</h3>
@@ -115,10 +164,30 @@ export function UsersPage() {
       </div>
 
       {pending.length > 0 ? (
-        <div className="banner banner--warn">
-          {pending.length} حساباً بلا دور، فلا يرى أي بيانات:{' '}
-          {pending.map((account) => account.email || account.full_name).join('، ')}. إن كان أحدهم
-          عضواً، أضف بريده في بطاقته بصفحة «الأعضاء» ثم امنحه دور «عضو» هنا.
+        <div className="banner banner--warn" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+          <div>
+            <strong>{pending.length} حساب(ات) في الانتظار بدون أي دور:</strong> لا يمكنهم تصفح أي بيانات حتى يتم تفعيلهم. يمكنك تفعيلهم كأعضاء مباشرة بضغطة زر:
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            {pending.map((account) => (
+              <div
+                key={account.id}
+                className="pill pill--neutral"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', padding: '0.4rem 0.75rem' }}
+              >
+                <span>{account.full_name || account.email}</span>
+                <button
+                  type="button"
+                  className="btn btn--primary btn--sm"
+                  style={{ padding: '0.2rem 0.6rem', fontSize: '12px' }}
+                  disabled={busy === `${account.id}:member`}
+                  onClick={() => void toggle(account, 'member', true)}
+                >
+                  {busy === `${account.id}:member` ? 'جارٍ…' : '✓ تفعيل كعضو'}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 

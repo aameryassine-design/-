@@ -40,17 +40,37 @@ L'application repose sur une **architecture multi-tenant (Multi-Majalis) hermét
 
 | Rôle | Identifiant ASCII | Où | Droits & Périmètre Multi-Tenant |
 |---|---|---|---|
-| **مشرف عام** | `super_admin` / `supervisor` | Site (`/admin/*`) | **Super Administrateur Global** : Accès complet (CRUD) à l'ensemble des Majalis, membres, séances, tâches et bilans. Dispose d'un filtre global (sélecteur de Majlis ou vue d'ensemble) sur le tableau de bord. |
-| **مشرف المجلس** | `majlis_admin` | Site (`/admin/*`) & APK | **Administrateur Local de Majlis** : Gère les membres, séances, présences, mémorisation et consulte les rapports **exclusivement** pour son propre Majlis (`majlis_id`). Ne peut en aucun cas lire ou modifier les données d'un autre Majlis. |
+| **مشرف عام** | `super_admin` / `supervisor` | Site (`/admin/*`) | **Super Administrateur Omnipotent** : Contrôle absolu sur l'ensemble du système. Peut attribuer et révoquer n'importe quel rôle à n'importe quel utilisateur, y compris promouvoir d'autres membres au rôle de `super_admin`. Pilote les paramètres globaux de la plateforme (`app_settings`). |
+| **مشرف المجلس** | `majlis_admin` | Site (`/admin/*`) & APK | **Administrateur Local de Majlis** : Gère les membres, séances, présences, mémorisation et valide/refuse les demandes d'adhésion en attente (`majlis_members`) **exclusivement** pour son propre Majlis (`majlis_id`). Ne peut en aucun cas lire ou modifier les données d'un autre Majlis. |
 | **مسؤول الواجبات الفردية** | `tasks_officer` | APK (`/app/*`) | Crée et gère les devoirs pour son Majlis. Ne voit **que** « أجاب / لم يجب » des membres de son Majlis via la vue `daily_participation`. |
-| **مسؤول الحفظ** | `memorization_officer` | APK (`/app/*`) | Crée les programmes de mémorisation et valide les أثمان **exclusivement** pour les membres de son Majlis. |
+| **مسؤول الحفظ** | `memorization_officer` | APK (`/app/*`) | Crée les programmes de mémorisation, valide les أثمان et consulte la carte interactive des 480 أثمان **exclusivement** pour les membres de son Majlis. |
 | **مسؤول المجلس الداخلي** | `majlis_leader` | APK (`/app/*`) | Note la présence aux séances de conseil interne pour les membres de son Majlis uniquement. |
-| **عضو** | `member` | APK (`/app/*`) | Renseigne ses واجبات, coche son ورد, lit les livres PDF, et consulte ses propres données et celles de son propre Majlis. |
+| **عضو** | `member` | APK (`/app/*`) | Renseigne ses واجبات, coche son ورد, consulte sa carte des 480 أثمان, lit les livres PDF, et consulte ses propres données et celles de ses Majalis actifs. |
+
+### Nouvelles Règles Métiers (Workflow d'inscription, Multi-Majalis & Fusion UI) :
+
+1. **Paramètre global d'auto-approbation (`app_settings.auto_approve_members`)** :
+   - Table singleton `public.app_settings (id = 1)`.
+   - Paramètre booléen commutable à tout moment par le Super Admin depuis son Dashboard ou la page des comptes (`UsersPage`).
+   - Le trigger d'inscription `handle_new_user` consulte ce paramètre : si `true`, le rôle `member` est accordé immédiatement ; si `false`, aucun rôle n'est inséré et l'utilisateur est orienté vers l'écran d'attente (`PendingPage`) jusqu'à validation explicite par le Super Admin.
+
+2. **Adhésion Multi-Majalis (`majlis_members`) & Règle stricte du 1ᵉʳ Majlis** :
+   - Table pivot `public.majlis_members` (`majlis_id`, `member_id`, `status` in `'active'/'pending'/'rejected'`).
+   - **Règle stricte du 1ᵉʳ Majlis** (garantie au niveau PostgreSQL par le trigger `handle_majlis_membership_status`) : Le tout premier Majlis rejoint par un membre est automatiquement `'active'`. Tout deuxième Majlis (ou plus) bascule automatiquement en `'pending'`.
+   - **UI Majlis Admin & Super Admin** : Section dédiée « طلبات الانضمام في الانتظار » (Demandes d'adhésion en attente) intégrée au Dashboard et à la page des membres pour accepter (`status = 'active'`) ou refuser (`status = 'rejected'`) ces demandes.
+   - **Isolation RLS** : `app.current_user_majlis_ids()` ne retient que les adhésions dont le statut est `'active'`.
+
+3. **Fusion UI (Hifz & Khareetat Al Athman)** :
+   - Fusion complète du suivi de mémorisation et de la carte des 480 أثمان en un seul écran unifié (`MemorizationPage`), éliminant tout changement d'onglet ou de page.
+   - Le responsable visualise la grille interactive des 480 أثمان et enregistre les أثمان de chaque membre au même endroit.
+
+4. **Omnipotence du Super Admin** :
+   - Pouvoir de gestion total dans l'interface `UsersPage` : attribution/révocation sans restriction de n'importe quel rôle (y compris promotion d'autres `super_admin`) et boutons de tressautement direct pour les comptes en attente.
 
 ### Règles d'isolation Multi-Tenant (RLS Supabase) :
 
 - **Étanchéité totale (Tenant Isolation)** : L'isolation est garantie par les RLS de Supabase (PostgreSQL) et les fonctions utilitaires du schéma privé `app` (`app.current_user_majlis_ids()`, `app.is_super_admin()`, `app.is_majlis_admin()`, etc.). Même en cas de manipulation directe des requêtes réseau par un utilisateur, la base de données bloque toute tentative de lecture ou d'écriture croisée entre Majalis.
-- **Rattachement et Scoping des rôles** : La table `user_roles` supporte désormais un attribut `majlis_id`. Les rôles de responsables (`majlis_admin`, `tasks_officer`, `memorization_officer`, `majlis_leader`) sont scopés au Majlis de l'utilisateur (via `user_roles.majlis_id` ou la fiche `members.majlis_id`). Seul le `super_admin` possède une portée globale (`majlis_id IS NULL`).
+- **Rattachement et Scoping des rôles** : La table `user_roles` supporte un attribut `majlis_id`. Les rôles de responsables (`majlis_admin`, `tasks_officer`, `memorization_officer`, `majlis_leader`) sont scopés au Majlis de l'utilisateur. Seul le `super_admin` possède une portée globale (`majlis_id IS NULL`).
 - **Tâches collectives scopées** : La table `individual_tasks` dispose d'un `majlis_id` pour que les tâches collectives d'un Majlis ne polluent pas les autres Majalis.
 - **Vue daily_participation filtrée** : La vue `daily_participation` filtre strictement les membres par le `majlis_id` du responsable connecté, interdisant toute fuite d'information transversale.
 
@@ -90,6 +110,8 @@ Migrations dans `supabase/migrations/`, **toutes appliquées en production** (vi
 4. `20260923090400_data_migration.sql` — reprise des données v1
 5. `20260923090500_bootstrap_supervisor.sql` — profils manquants des comptes antérieurs au trigger, rôle `supervisor` pour aameryassine@gmail.com (échoue volontairement si le rôle n'est pas en place)
 6. `20260924091000_auto_member_role.sql` — attribution automatique du rôle `member` et création de fiche `members` lors de l'inscription via `handle_new_user`
+7. `20260925090000_multitenant_rls.sql` — refonte SaaS multi-tenant hermétique (`majlis_admin`, scoping `user_roles.majlis_id`, isolation RLS par Majlis)
+8. `20260928090000_workflow_multi_majalis_settings.sql` — table singleton `app_settings` (toggle `auto_approve_members`), table pivot `majlis_members` (multi-adhésion avec statuts active/pending/rejected), trigger de la règle du 1er Majlis, et omnipotence `super_admin`.
 
 Tests : `supabase/tests/rls_tests.sql` (environ 91 scénarios, dont le bloc « F. e-mail inconnu »). Le fichier se termine par un `rollback`. La CLI ne sait pas l'exécuter : il se lance en le collant dans le SQL Editor.
 

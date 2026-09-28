@@ -45,6 +45,27 @@ export interface UserRoleRow {
   granted_at: string
 }
 
+export type MembershipStatus = 'active' | 'pending' | 'rejected'
+
+export interface MajlisMember {
+  id: string
+  majlis_id: string
+  member_id: string
+  status: MembershipStatus
+  joined_at: string
+  decided_at: string | null
+  decided_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface AppSettings {
+  id: number
+  auto_approve_members: boolean
+  updated_at: string
+  updated_by: string | null
+}
+
 // ------------------------------------------------------------------ حلقة
 
 export interface Majlis {

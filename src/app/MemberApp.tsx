@@ -60,7 +60,7 @@ export default function MemberApp() {
           <p className="mobile__user">{name}</p>
         </div>
         <div className="row-actions">
-          {has('supervisor') ? (
+          {has('supervisor', 'super_admin', 'majlis_admin') ? (
             <a className="btn btn--ghost btn--sm" href="#/admin">
               الإدارة
             </a>
