@@ -56,7 +56,10 @@ export function useMajlisMembers(majlisId?: string | null) {
         return
       }
 
-      const formatted: MembershipRequest[] = (data || []).map((row: any) => ({
+      const formatted: MembershipRequest[] = (data ?? []).map((row) => {
+        const relatedMember = Array.isArray(row.members) ? row.members[0] : row.members
+        const relatedMajlis = Array.isArray(row.majalis) ? row.majalis[0] : row.majalis
+        return {
         id: row.id,
         majlis_id: row.majlis_id,
         member_id: row.member_id,
@@ -66,9 +69,10 @@ export function useMajlisMembers(majlisId?: string | null) {
         decided_by: row.decided_by,
         created_at: row.created_at,
         updated_at: row.updated_at,
-        member: row.members ? (row.members as Member) : null,
-        majlis_name: row.majalis ? row.majalis.name : null,
-      }))
+        member: relatedMember as Member | null,
+        majlis_name: relatedMajlis?.name ?? null,
+        }
+      })
 
       setRequests(formatted)
     } catch (err) {
@@ -79,20 +83,18 @@ export function useMajlisMembers(majlisId?: string | null) {
   }, [majlisId])
 
   useEffect(() => {
-    void fetchRequests()
+    const timer = window.setTimeout(() => void fetchRequests(), 0)
+    return () => window.clearTimeout(timer)
   }, [fetchRequests])
 
   const updateStatus = useCallback(
     async (requestId: string, status: MembershipStatus): Promise<boolean> => {
       setBusyId(requestId)
       try {
-        const { error: updateErr } = await supabase
-          .from('majlis_members')
-          .update({
-            status,
-            decided_at: new Date().toISOString(),
-          })
-          .eq('id', requestId)
+        const { error: updateErr } = await supabase.rpc('decide_majlis_membership', {
+          _membership_id: requestId,
+          _status: status,
+        })
 
         if (updateErr) {
           setError(errorMessage(updateErr))

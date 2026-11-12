@@ -128,7 +128,8 @@ export function BookReaderPage() {
   }, [page, zoom])
 
   useEffect(() => {
-    void render()
+    const timer = window.setTimeout(() => void render(), 0)
+    return () => window.clearTimeout(timer)
   }, [render, pageCount])
 
   useEffect(() => {
@@ -149,7 +150,9 @@ export function BookReaderPage() {
           status: page >= pageCount ? 'أنهى' : 'قيد القراءة',
         },
         { onConflict: 'book_id,member_id' },
-      )
+      ).then(({ error: progressError }) => {
+        if (progressError) setError(errorMessage(progressError))
+      })
     }, 1500)
     return () => window.clearTimeout(timer)
   }, [member, bookId, page, pageCount])

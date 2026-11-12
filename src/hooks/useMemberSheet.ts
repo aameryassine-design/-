@@ -9,11 +9,10 @@ interface SheetRow {
 }
 
 function stripTimestamps<T extends object>(row: T): Partial<T> {
-  const { created_at: _created, updated_at: _updated, ...rest } = row as T & {
-    created_at?: string
-    updated_at?: string
-  }
-  return rest as Partial<T>
+  const copy = { ...row } as Record<string, unknown>
+  delete copy.created_at
+  delete copy.updated_at
+  return copy as Partial<T>
 }
 
 /**
@@ -33,19 +32,18 @@ export function useMemberSheet<T extends SheetRow>(
 
   const scopeKey = scope ? JSON.stringify(scope) : ''
   const rowsRef = useRef(rows)
-  rowsRef.current = rows
 
   useEffect(() => {
-    if (!scopeKey) {
-      setRows({})
-      setLoading(false)
-      return
-    }
+    rowsRef.current = rows
+  }, [rows])
+
+  useEffect(() => {
+    if (!scopeKey) return
 
     let cancelled = false
-    setLoading(true)
 
     const load = async () => {
+      setLoading(true)
       let query = supabase.from(table).select('*')
       for (const [column, value] of Object.entries(JSON.parse(scopeKey) as Scope)) {
         query = query.eq(column, value)
@@ -133,5 +131,12 @@ export function useMemberSheet<T extends SheetRow>(
     [table],
   )
 
-  return { rows, loading, error, pending, save, clear }
+  return {
+    rows: scopeKey ? rows : {},
+    loading: scopeKey ? loading : false,
+    error,
+    pending,
+    save,
+    clear,
+  }
 }

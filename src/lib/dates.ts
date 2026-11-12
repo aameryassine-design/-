@@ -48,7 +48,9 @@ export function endOfMonth(iso: string): string {
 
 export function addMonths(iso: string, months: number): string {
   const date = parseISODate(iso)
-  return toISODate(new Date(date.getFullYear(), date.getMonth() + months, date.getDate()))
+  const targetMonth = date.getMonth() + months
+  const lastDay = new Date(date.getFullYear(), targetMonth + 1, 0).getDate()
+  return toISODate(new Date(date.getFullYear(), targetMonth, Math.min(date.getDate(), lastDay)))
 }
 
 export function formatDate(iso: string): string {

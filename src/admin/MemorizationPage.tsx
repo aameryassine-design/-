@@ -54,10 +54,7 @@ export function MemorizationPage() {
   const activeProgram = programs.find((p) => p.member_id === activeTargetId)
 
   // Identifiant cible pour le stockage Supabase
-  const targetUserId =
-    activeTargetId === 'me'
-      ? (user?.id ?? 'supervisor_me')
-      : activeMember?.user_id || activeMember?.id || activeTargetId
+  const targetUserId = activeTargetId === 'me' ? user?.id : activeMember?.user_id
 
   const targetDisplayName =
     activeTargetId === 'me'
@@ -173,8 +170,9 @@ export function MemorizationPage() {
       <div style={{ marginBottom: '2rem' }}>
         <QuranMemorizationGrid
           key={targetUserId}
-          userId={targetUserId}
+          userId={targetUserId ?? undefined}
           memberName={targetDisplayName}
+          onPersistenceError={(message) => toast(message, 'error')}
         />
       </div>
 

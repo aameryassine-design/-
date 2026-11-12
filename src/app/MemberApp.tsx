@@ -48,7 +48,6 @@ export default function MemberApp() {
 
   const tabs = useMemo(
     () => TABS.filter((tab) => tab.roles === null || has(...tab.roles)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [has],
   )
 

@@ -32,6 +32,6 @@ git push origin main
 echo ""
 echo "==================================================="
 echo "  Succès ! Modifications envoyées avec succès."
-echo "  Netlify met à jour le site : https://jalessa.netlify.app"
+echo "  Vercel met à jour le site configuré pour ce dépôt."
 echo "==================================================="
 echo ""

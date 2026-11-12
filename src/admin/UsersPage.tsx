@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../auth/AuthProvider'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
 import { useToast } from '../components/Toast'
@@ -9,7 +10,7 @@ import { errorMessage, supabase } from '../lib/supabase'
 import type { AppRole, Member, Profile } from '../lib/types'
 
 interface Account extends Profile {
-  roles: AppRole[]
+  grants: { role: AppRole; majlis_id: string | null }[]
   member: Member | null
 }
 
@@ -21,53 +22,51 @@ async function loadAccounts(): Promise<Account[]> {
   ])
 
   const profiles = unwrap<Profile[]>(profileResult)
-  const grants = unwrap<{ user_id: string; role: AppRole }[]>(roleResult)
+  const grants = unwrap<{ user_id: string; role: AppRole; majlis_id: string | null }[]>(roleResult)
   const members = unwrap<Member[]>(memberResult)
 
   return profiles.map((profile) => ({
     ...profile,
-    roles: grants.filter((grant) => grant.user_id === profile.id).map((grant) => grant.role),
+    grants: grants.filter((grant) => grant.user_id === profile.id),
     member: members.find((member) => member.user_id === profile.id) ?? null,
   }))
 }
 
 export function UsersPage() {
   const toast = useToast()
+  const { isSuperAdmin, majlisId } = useAuth()
   const { settings, loading: settingsLoading, updating: settingsUpdating, setAutoApprove } = useAppSettings()
   const accounts = useAsync(loadAccounts, [])
   const [busy, setBusy] = useState<string | null>(null)
 
   const hasRole = (account: Account, role: AppRole) => {
     if (role === 'supervisor' || role === 'super_admin') {
-      return account.roles.includes('supervisor') || account.roles.includes('super_admin')
+      return account.grants.some((grant) => grant.majlis_id === null && (grant.role === 'supervisor' || grant.role === 'super_admin'))
     }
-    return account.roles.includes(role)
+    return majlisId !== null && account.grants.some((grant) => grant.role === role && grant.majlis_id === majlisId)
   }
 
   const toggle = async (account: Account, role: AppRole, next: boolean) => {
     setBusy(`${account.id}:${role}`)
 
-    const roleMajlisId =
-      role === 'supervisor' || role === 'super_admin'
-        ? null
-        : (account.member?.majlis_id ?? null)
-
     let error = null
-    if (next) {
-      const res = await supabase.from('user_roles').insert({
-        user_id: account.id,
-        role,
-        majlis_id: roleMajlisId,
-      })
-      error = res.error
-    } else {
-      let query = supabase.from('user_roles').delete().eq('user_id', account.id)
-      if (role === 'supervisor' || role === 'super_admin') {
-        query = query.in('role', ['supervisor', 'super_admin'])
-      } else {
-        query = query.eq('role', role)
+    if (role === 'supervisor' || role === 'super_admin') {
+      if (!isSuperAdmin) {
+        toast('هذه العملية مخصصة للمشرف العام', 'error')
+        setBusy(null)
+        return
       }
-      const res = await query
+      const res = await supabase.rpc('set_global_admin', { _user_id: account.id, _enabled: next })
+      error = res.error
+    } else if (!majlisId) {
+      toast('اختر مجلساً نشطاً أولاً', 'error')
+    } else {
+      const res = await supabase.rpc('set_majlis_role', {
+        _user_id: account.id,
+        _role: role,
+        _majlis_id: majlisId,
+        _enabled: next,
+      })
       error = res.error
     }
 
@@ -83,7 +82,7 @@ export function UsersPage() {
   }
 
   const list = accounts.data ?? []
-  const pending = list.filter((account) => account.roles.length === 0)
+  const pending = list.filter((account) => account.grants.length === 0)
 
   return (
     <section className="page">
@@ -123,8 +122,8 @@ export function UsersPage() {
             </h4>
             <p className="card__hint" style={{ margin: '2px 0 0 0', fontSize: '13px' }}>
               {settings?.auto_approve_members
-                ? 'مفعل: يحصل العضو الجديد على دور «عضو» تلقائياً فور تسجيل حسابه.'
-                : 'معطل: يبقى الحساب الجديد معلقاً بدون أي دور في انتظار تفعيله يدوياً أدناه.'}
+                ? 'مفعل: أول طلب انضمام لمجلس يصبح نشطاً تلقائياً. دخول الحساب لا يتأثر.'
+                : 'معطل: أول طلب انضمام لمجلس ينتظر قرار مسؤول المجلس. دخول الحساب لا يتأثر.'}
             </p>
           </div>
         </div>

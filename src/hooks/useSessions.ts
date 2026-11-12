@@ -39,7 +39,8 @@ export function useSessions(types: readonly SessionType[], majlisId?: string | n
   }, [typeList, majlisId])
 
   useEffect(() => {
-    void refresh()
+    const timer = window.setTimeout(() => void refresh(), 0)
+    return () => window.clearTimeout(timer)
   }, [refresh])
 
   const create = useCallback(

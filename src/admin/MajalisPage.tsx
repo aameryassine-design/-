@@ -75,26 +75,18 @@ export function MajalisPage() {
    * sans quoi il verrait bien son مجلس en base mais pas l'écran dans l'app.
    */
   const setLeader = async (majlis: Majlis, userId: string) => {
-    const { error } = await supabase
-      .from('majalis')
-      .update({ leader_user_id: userId || null })
-      .eq('id', majlis.id)
+    const { error } = await supabase.rpc('replace_majlis_leader', {
+      _majlis_id: majlis.id,
+      _user_id: userId || null,
+    })
 
     if (error) {
       toast(errorMessage(error), 'error')
       return
     }
 
-    if (userId) {
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .upsert({ user_id: userId, role: 'majlis_leader' }, { onConflict: 'user_id,role' })
-      if (roleError) toast(errorMessage(roleError), 'error')
-      else toast('تم تعيين المسؤول ومنحه الدور')
-      accounts.refresh()
-    } else {
-      toast('تم رفع التعيين')
-    }
+    toast(userId ? 'تم تعيين المسؤول ومنحه الدور' : 'تم رفع التعيين')
+    accounts.refresh()
 
     majalis.refresh()
   }

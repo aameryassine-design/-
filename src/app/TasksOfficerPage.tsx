@@ -13,6 +13,8 @@ import {
   todayISO,
 } from '../lib/dates'
 import { errorMessage, supabase } from '../lib/supabase'
+import { tasksWhatsAppMessage } from '../lib/whatsapp'
+import { WhatsAppButton } from '../components/WhatsAppButton'
 import type { DailyParticipation, IndividualTask } from '../lib/types'
 
 /**
@@ -175,7 +177,17 @@ export function TasksOfficerPage() {
             <tbody>
               {members.map((member) => (
                 <tr key={member.id}>
-                  <td className="sheet__name">{member.full_name}</td>
+                  <td className="sheet__name">
+                    <span className="member-name-with-action">
+                      {member.full_name}
+                      <WhatsAppButton
+                        phone={member.phone}
+                        memberName={member.full_name}
+                        message={tasksWhatsAppMessage(member.full_name)}
+                        disabled={responded(member.id, today)}
+                      />
+                    </span>
+                  </td>
                   {days.map((day) => {
                     const ok = responded(member.id, day)
                     return (

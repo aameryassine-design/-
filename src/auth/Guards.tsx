@@ -56,13 +56,12 @@ export function AccessDenied({ needed }: { needed: readonly AppRole[] }) {
   )
 }
 
-/** Exige une session valide et au moins un rôle. */
+/** Exige une session valide ; le rôle member est fourni automatiquement côté base. */
 export function RequireAuth({ children }: { children: ReactNode }) {
-  const { loading, session, roles } = useAuth()
+  const { loading, session } = useAuth()
 
   if (loading) return <Loading label="جارٍ التحقق…" />
   if (!session) return <Navigate to="/login" replace />
-  if (roles.length === 0) return <PendingPage />
   return <>{children}</>
 }
 
@@ -85,10 +84,9 @@ export function RequireRole({
 
 /** Aiguillage de la racine : le site pour les administrateurs (général ou de مجلس), l'app pour les autres. */
 export function HomeRedirect() {
-  const { loading, session, roles, has } = useAuth()
+  const { loading, session, has } = useAuth()
 
   if (loading) return <Loading label="جارٍ التحقق…" />
   if (!session) return <Navigate to="/login" replace />
-  if (roles.length === 0) return <PendingPage />
   return <Navigate to={has('supervisor', 'super_admin', 'majlis_admin') ? '/admin' : '/app'} replace />
 }

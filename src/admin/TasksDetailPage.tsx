@@ -8,6 +8,8 @@ import { useAsync, unwrap } from '../hooks/useAsync'
 import { useMembers } from '../hooks/useMembers'
 import { formatDate, todayISO } from '../lib/dates'
 import { errorMessage, supabase } from '../lib/supabase'
+import { tasksWhatsAppMessage } from '../lib/whatsapp'
+import { WhatsAppButton } from '../components/WhatsAppButton'
 import type { IndividualTask, TaskEntry } from '../lib/types'
 
 interface DayData {
@@ -191,7 +193,17 @@ export function TasksDetailPage() {
 
                 return (
                   <tr key={member.id}>
-                    <td className="sheet__name">{member.full_name}</td>
+                    <td className="sheet__name">
+                      <span className="member-name-with-action">
+                        {member.full_name}
+                        <WhatsAppButton
+                          phone={member.phone}
+                          memberName={member.full_name}
+                          message={tasksWhatsAppMessage(member.full_name)}
+                          disabled={mine.length === 0 || done === mine.length}
+                        />
+                      </span>
+                    </td>
                     {dayTasks.map((task) => {
                       if (!appliesTo(task, member.id)) {
                         return (

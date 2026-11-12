@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CommitInput } from '../components/CommitInput'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { PageHeader } from '../components/PageHeader'
@@ -26,20 +26,17 @@ export function TextsSheet() {
   const { members, loading: membersLoading, error: membersError } = useMembers()
   const [sessionId, setSessionId] = useState<string | null>(null)
 
-  useEffect(() => {
-    setSessionId((current) => {
-      if (sessions.length === 0) return null
-      if (current && sessions.some((session) => session.id === current)) return current
-      return sessions[0].id
-    })
-  }, [sessions])
+  const selectedSessionId =
+    sessionId && sessions.some((session) => session.id === sessionId)
+      ? sessionId
+      : (sessions[0]?.id ?? null)
 
-  const session = sessions.find((item) => item.id === sessionId) ?? null
+  const session = sessions.find((item) => item.id === selectedSessionId) ?? null
 
   const { rows, loading: rowsLoading, error: rowsError, pending, save } =
     useMemberSheet<MemorizationTextRecord>(
       'memorization_texts',
-      sessionId ? { session_id: sessionId } : null,
+      selectedSessionId ? { session_id: selectedSessionId } : null,
       'session_id,member_id',
     )
 
@@ -73,7 +70,7 @@ export function TextsSheet() {
 
       <SessionPicker
         sessions={sessions}
-        value={sessionId}
+        value={selectedSessionId}
         onChange={setSessionId}
         onCreate={create}
         onDelete={remove}
@@ -105,7 +102,7 @@ export function TextsSheet() {
         <EmptyState title="لا يوجد أعضاء نشطون" hint="أضف الأعضاء من صفحة «الأعضاء» أولاً." />
       ) : null}
 
-      {sessionId && members.length > 0 ? (
+      {selectedSessionId && members.length > 0 ? (
         <>
           <div className="sheet-toolbar">
             <div className="sheet-toolbar__stats">

@@ -32,6 +32,84 @@ $$;
 --  2. المجالس الداخلية — un responsable, plusieurs membres
 -- ----------------------------------------------------------------------------
 
+-- Base v1 compatible for a fresh project. Existing installations keep their
+-- rows and receive only the additive columns declared below.
+create table if not exists public.members (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  phone text,
+  note text,
+  status text not null default 'نشط',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.sessions (
+  id uuid primary key default gen_random_uuid(),
+  type text not null,
+  session_date date not null default current_date,
+  label text,
+  lesson_text text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.books (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  author text,
+  is_active boolean not null default true,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.book_reading_progress (
+  id uuid primary key default gen_random_uuid(),
+  book_id uuid not null references public.books(id) on delete restrict,
+  member_id uuid not null references public.members(id) on delete cascade,
+  status text not null default 'لم يبدأ',
+  finished_date date,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (book_id, member_id)
+);
+
+create table if not exists public.attendance (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  member_id uuid not null references public.members(id) on delete cascade,
+  status text not null,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (session_id, member_id)
+);
+
+create table if not exists public.preparation (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  member_id uuid not null references public.members(id) on delete cascade,
+  status text not null,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (session_id, member_id)
+);
+
+create table if not exists public.memorization_texts (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid not null references public.sessions(id) on delete cascade,
+  member_id uuid not null references public.members(id) on delete cascade,
+  status text not null,
+  lesson_override text,
+  note text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (session_id, member_id)
+);
+
 create table if not exists public.majalis (
   id              uuid primary key default gen_random_uuid(),
   name            text not null unique,

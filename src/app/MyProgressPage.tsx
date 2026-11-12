@@ -65,8 +65,8 @@ export function MyProgressPage() {
   const [activeTab, setActiveTab] = useState<'quran' | 'summary'>('quran')
   const memberId = member?.id ?? ''
 
-  const state = useAsync(
-    () => (memberId ? loadMine(memberId, period) : Promise.resolve(null as unknown as MyData)),
+  const state = useAsync<MyData | null>(
+    () => (memberId ? loadMine(memberId, period) : Promise.resolve(null)),
     [memberId, period.start, period.end],
   )
 

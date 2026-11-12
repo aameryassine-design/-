@@ -25,7 +25,8 @@ export function currentMonth(): Period {
 
 export function lastMonths(count: number): Period {
   const today = todayISO()
-  return { start: startOfMonth(addMonths(today, -(count - 1))), end: endOfMonth(today) }
+  const currentMonthStart = startOfMonth(today)
+  return { start: addMonths(currentMonthStart, -(count - 1)), end: endOfMonth(today) }
 }
 
 /** Fenêtre précédente, de même longueur, juste avant `period`. */

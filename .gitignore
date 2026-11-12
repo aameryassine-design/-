@@ -17,3 +17,5 @@ ios/
 # Fichiers de travail de la CLI Supabase
 supabase/.temp/
 supabase/.branches/
+.vercel
+.env*

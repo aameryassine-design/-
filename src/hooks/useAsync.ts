@@ -23,26 +23,28 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[]): AsyncSta
   const [tick, setTick] = useState(0)
 
   const loaderRef = useRef(loader)
-  loaderRef.current = loader
+
+  useEffect(() => {
+    loaderRef.current = loader
+  }, [loader])
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-
-    loaderRef
-      .current()
-      .then((result) => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const result = await loaderRef.current()
         if (cancelled) return
         setData(result)
         setError(null)
-      })
-      .catch((caught: unknown) => {
-        if (cancelled) return
-        setError(errorMessage(caught))
-      })
-      .finally(() => {
+      } catch (caught) {
+        if (!cancelled) setError(errorMessage(caught))
+      } finally {
         if (!cancelled) setLoading(false)
-      })
+      }
+    }
+
+    void load()
 
     return () => {
       cancelled = true
@@ -58,5 +60,6 @@ export function useAsync<T>(loader: () => Promise<T>, deps: unknown[]): AsyncSta
 /** Déballe une réponse Supabase en levant l'erreur éventuelle. */
 export function unwrap<T>(result: { data: T | null; error: unknown }): T {
   if (result.error) throw result.error
-  return (result.data ?? []) as T
+  if (result.data === null) throw new Error('Réponse Supabase vide inattendue')
+  return result.data
 }

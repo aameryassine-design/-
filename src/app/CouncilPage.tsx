@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { EmptyState, ErrorBanner, Loading } from '../components/Feedback'
 import { useToast } from '../components/Toast'
 import { useAsync, unwrap } from '../hooks/useAsync'
@@ -23,44 +23,44 @@ export function CouncilPage() {
 
   const [majlisId, setMajlisId] = useState<string | null>(null)
 
-  useEffect(() => {
-    const list = majalis.data ?? []
-    if (list.length > 0 && !majlisId) setMajlisId(list[0].id)
-  }, [majalis.data, majlisId])
+  const availableMajalis = majalis.data ?? []
+  const selectedMajlisId =
+    majlisId && availableMajalis.some((majlis) => majlis.id === majlisId)
+      ? majlisId
+      : (availableMajalis[0]?.id ?? null)
 
   const { sessions, loading: sessionsLoading, error: sessionsError, create } = useSessions(
     TYPES,
-    majlisId,
+    selectedMajlisId,
   )
   const { members, loading: membersLoading } = useMembers()
   const [sessionId, setSessionId] = useState<string | null>(null)
 
-  useEffect(() => {
-    setSessionId((current) => {
-      if (sessions.length === 0) return null
-      if (current && sessions.some((session) => session.id === current)) return current
-      return sessions[0].id
-    })
-  }, [sessions])
+  const selectedSessionId =
+    sessionId && sessions.some((session) => session.id === sessionId)
+      ? sessionId
+      : (sessions[0]?.id ?? null)
 
   const { rows, loading: rowsLoading, error: rowsError, pending, save } =
     useMemberSheet<AttendanceRecord>(
       'attendance',
-      sessionId ? { session_id: sessionId } : null,
+      selectedSessionId ? { session_id: selectedSessionId } : null,
       'session_id,member_id',
     )
 
-  const mine = majlisId ? members.filter((member) => member.majlis_id === majlisId) : members
+  const mine = selectedMajlisId
+    ? members.filter((member) => member.majlis_id === selectedMajlisId)
+    : members
   const recorded = mine.filter((member) => rows[member.id]).length
 
   const newSession = async () => {
-    if (!majlisId) return
+    if (!selectedMajlisId) return
     const today = todayISO()
     if (sessions.some((session) => session.session_date === today)) {
       toast('جلسة اليوم موجودة', 'error')
       return
     }
-    const created = await create({ type: 'مجلس داخلي', session_date: today, majlis_id: majlisId })
+    const created = await create({ type: 'مجلس داخلي', session_date: today, majlis_id: selectedMajlisId })
     if (created) {
       setSessionId(created.id)
       toast('تم فتح جلسة اليوم')
@@ -90,7 +90,7 @@ export function CouncilPage() {
           <span className="label">المجلس</span>
           <select
             className="input"
-            value={majlisId ?? ''}
+            value={selectedMajlisId ?? ''}
             onChange={(event) => setMajlisId(event.target.value)}
           >
             {(majalis.data ?? []).map((majlis) => (
@@ -105,7 +105,7 @@ export function CouncilPage() {
       <div className="card day-switch">
         <select
           className="input"
-          value={sessionId ?? ''}
+          value={selectedSessionId ?? ''}
           disabled={sessions.length === 0}
           onChange={(event) => setSessionId(event.target.value)}
         >
@@ -127,7 +127,7 @@ export function CouncilPage() {
         <EmptyState title="لا جلسات" hint="افتح جلسة اليوم بالزر أعلاه." />
       ) : null}
 
-      {sessionId && mine.length > 0 ? (
+      {selectedSessionId && mine.length > 0 ? (
         <>
           <div className="sheet-toolbar__stats">
             <span className={`pill pill--${recorded === mine.length ? 'good' : 'neutral'}`}>
@@ -166,7 +166,7 @@ export function CouncilPage() {
         </>
       ) : null}
 
-      {sessionId && mine.length === 0 ? (
+      {selectedSessionId && mine.length === 0 ? (
         <EmptyState title="لا أعضاء في مجلسك" hint="يُلحقهم المشرف العام بالمجلس من الموقع." />
       ) : null}
     </section>

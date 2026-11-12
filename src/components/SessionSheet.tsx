@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useMemberSheet } from '../hooks/useMemberSheet'
 import { useMembers } from '../hooks/useMembers'
 import { useSessions } from '../hooks/useSessions'
@@ -10,6 +10,8 @@ import { PageHeader } from './PageHeader'
 import { SessionPicker } from './SessionPicker'
 import { StatusPicker } from './StatusPicker'
 import { useToast } from './Toast'
+import { WhatsAppButton } from './WhatsAppButton'
+import { absenceWhatsAppMessage } from '../lib/whatsapp'
 
 interface SheetRecord<T extends string> {
   id: string
@@ -51,13 +53,10 @@ export function SessionSheet<T extends string>({
   const { members, loading: membersLoading, error: membersError } = useMembers()
   const [sessionId, setSessionId] = useState<string | null>(null)
 
-  useEffect(() => {
-    setSessionId((current) => {
-      if (sessions.length === 0) return null
-      if (current && sessions.some((session) => session.id === current)) return current
-      return sessions[0].id
-    })
-  }, [sessions])
+  const selectedSessionId =
+    sessionId && sessions.some((session) => session.id === sessionId)
+      ? sessionId
+      : (sessions[0]?.id ?? null)
 
   const {
     rows,
@@ -67,7 +66,7 @@ export function SessionSheet<T extends string>({
     save,
   } = useMemberSheet<SheetRecord<T>>(
     table,
-    sessionId ? { session_id: sessionId } : null,
+    selectedSessionId ? { session_id: selectedSessionId } : null,
     'session_id,member_id',
   )
 
@@ -99,7 +98,7 @@ export function SessionSheet<T extends string>({
 
       <SessionPicker
         sessions={sessions}
-        value={sessionId}
+        value={selectedSessionId}
         onChange={setSessionId}
         onCreate={create}
         onDelete={remove}
@@ -117,7 +116,7 @@ export function SessionSheet<T extends string>({
         <EmptyState title="لا يوجد أعضاء نشطون" hint="أضف الأعضاء من صفحة «الأعضاء» أولاً." />
       ) : null}
 
-      {sessionId && members.length > 0 ? (
+      {selectedSessionId && members.length > 0 ? (
         <>
           <div className="sheet-toolbar">
             <div className="sheet-toolbar__stats">
@@ -161,7 +160,19 @@ export function SessionSheet<T extends string>({
                     const row = rows[member.id]
                     return (
                       <tr key={member.id} className={pending.includes(member.id) ? 'is-saving' : ''}>
-                        <td className="sheet__name">{member.full_name}</td>
+                        <td className="sheet__name">
+                          <span className="member-name-with-action">
+                            {member.full_name}
+                            {table === 'attendance' ? (
+                              <WhatsAppButton
+                                phone={member.phone}
+                                memberName={member.full_name}
+                                message={absenceWhatsAppMessage(member.full_name)}
+                                disabled={row?.status !== 'غائب'}
+                              />
+                            ) : null}
+                          </span>
+                        </td>
                         <td>
                           <StatusPicker
                             options={options}

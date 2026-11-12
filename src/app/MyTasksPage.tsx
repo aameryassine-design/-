@@ -46,8 +46,8 @@ export function MyTasksPage() {
   const [saving, setSaving] = useState<string | null>(null)
 
   const memberId = member?.id ?? ''
-  const day = useAsync(
-    () => (memberId ? loadDay(memberId, date) : Promise.resolve(null as unknown as DayData)),
+  const day = useAsync<DayData | null>(
+    () => (memberId ? loadDay(memberId, date) : Promise.resolve(null)),
     [memberId, date],
   )
 

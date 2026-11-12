@@ -1,10 +1,10 @@
 -- ============================================================================
 --  VÉRIFICATION DE LA RLS, RÔLE PAR RÔLE
 --
---  À coller dans Supabase Dashboard > SQL Editor, APRÈS les 4 migrations.
---  Tout le script tourne dans une transaction qui se termine par ROLLBACK :
---  les comptes et les données de test n'existent que le temps du test, et
---  le script est donc sûr à passer sur la base de production.
+--  À exécuter uniquement contre une instance Supabase locale jetable, après
+--  les migrations. Le script crée des comptes et des données synthétiques.
+--  Il est volontairement refusé tant que `app.audit_local_test = on` n'est
+--  pas défini pour empêcher toute exécution contre la production.
 --
 --  Le résultat affiché est un tableau ; les lignes ❌ apparaissent EN HAUT.
 --  Une seule ❌ = régression de sécurité, ne pas déployer.
@@ -12,6 +12,13 @@
 --  Le test central est le bloc A : le مسؤول الواجبات الفردية ne peut lire
 --  ni les statuts, ni le nombre de tâches saisies, par aucune requête.
 -- ============================================================================
+
+do $$
+begin
+  if current_setting('app.audit_local_test', true) is distinct from 'on' then
+    raise exception 'RLS tests are local-only. Set app.audit_local_test=on in an isolated database.';
+  end if;
+end $$;
 
 begin;
 

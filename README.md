@@ -45,10 +45,10 @@ parviennent, même par requête directe. Voir
 
 ### 1. Base de données
 
-Exécuter, dans l'ordre, les 5 fichiers de [`supabase/migrations/`](supabase/migrations/)
-dans **Supabase Dashboard > SQL Editor**, puis `supabase/tests/rls_tests.sql`
-pour vérifier. Détail et ordre de bascule sans coupure :
-[`supabase/README.md`](supabase/README.md).
+Ne pas appliquer les migrations depuis le Dashboard à l'aveugle. Construire et
+vérifier d'abord une instance Supabase locale jetable, puis comparer l'historique
+du projet distant. `supabase/tests/rls_tests.sql` est strictement local : il
+nécessite le paramètre de garde `app.audit_local_test = on`.
 
 ### 2. Variables d'environnement
 
@@ -67,7 +67,7 @@ donnée, tout passe par Supabase Auth et les policies RLS.
 ### 3. Lancer en local
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -81,11 +81,11 @@ npm run dev
    avec ce même e-mail, son compte est relié à sa fiche et reçoit le rôle عضو.
 4. Dans **الحسابات**, accorder les rôles des responsables.
 
-## Déploiement du site (Netlify)
+## Déploiement du site (Vercel)
 
-`netlify.toml` est prêt : build `npm run build`, publication `dist/`.
+`vercel.json` configure Vite, la sortie `dist/`, le cache des assets et les en-têtes de sécurité.
 Régler `VITE_SUPABASE_URL` et `VITE_SUPABASE_ANON_KEY` dans
-**Site configuration > Environment variables**.
+**Project Settings > Environment Variables**, séparées entre Development, Preview et Production.
 
 Le routeur fonctionne par hash (`#/admin`, `#/app`), donc aucune configuration
 serveur particulière n'est nécessaire.

@@ -23,7 +23,8 @@ export function useMembers(includeArchived = false, majlisId?: string | null) {
   }, [includeArchived, majlisId])
 
   useEffect(() => {
-    void refresh()
+    const timer = window.setTimeout(() => void refresh(), 0)
+    return () => window.clearTimeout(timer)
   }, [refresh])
 
   return { members, loading, error, refresh }

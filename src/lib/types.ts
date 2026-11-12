@@ -66,6 +66,23 @@ export interface AppSettings {
   updated_by: string | null
 }
 
+export type HifzSessionType = 'nouvelle_memorisation' | 'revision'
+export type HifzEvaluationLevel = 1 | 2 | 3
+
+export interface HifzHistoryEvent {
+  id: string
+  member_id: string
+  majlis_id: string | null
+  thmoun_id: number
+  session_type: HifzSessionType
+  evaluation_level: HifzEvaluationLevel
+  recorded_by: string | null
+  source: 'app' | 'legacy_import'
+  created_at: string
+}
+
+export type HifzLatestState = HifzHistoryEvent
+
 // ------------------------------------------------------------------ حلقة
 
 export interface Majlis {

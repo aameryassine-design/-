@@ -1,377 +1,121 @@
-import { useState, useOptimistic, useTransition, useMemo, useEffect } from 'react'
-import { ATHMAN_CATALOG, type ThmounMeta, type SurahSegment } from '../data/athmanCatalog'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useAuth } from '../auth/AuthProvider'
+import { ATHMAN_CATALOG, type SurahSegment, type ThmounMeta } from '../data/athmanCatalog'
 import { getSurahsTrackForHizb } from '../data/quranMapping'
-import { supabase } from '../lib/supabase'
+import { errorMessage, supabase } from '../lib/supabase'
+import type { HifzEvaluationLevel, HifzLatestState, HifzSessionType } from '../lib/types'
 import './QuranMemorizationGrid.css'
 
 export type MemorizationLevel = 'none' | 'weak' | 'medium' | 'mastered'
 
-export const LEVEL_THEME: Record<
-  MemorizationLevel,
-  { label: string; color: string; bg: string; border: string; glow: string }
-> = {
-  none: {
-    label: 'غير محفوظ',
-    color: '#94a3b8',
-    bg: '#1e293b',
-    border: '#334155',
-    glow: 'transparent',
-  },
-  weak: {
-    label: 'ضعيف / قيد الحفظ',
-    color: '#ffffff',
-    bg: '#ef4444',
-    border: '#dc2626',
-    glow: 'rgba(239, 68, 68, 0.35)',
-  },
-  medium: {
-    label: 'متوسط / يتطلب مراجعة',
-    color: '#ffffff',
-    bg: '#f59e0b',
-    border: '#d97706',
-    glow: 'rgba(245, 158, 11, 0.35)',
-  },
-  mastered: {
-    label: 'متقن تماماً',
-    color: '#ffffff',
-    bg: '#10b981',
-    border: '#059669',
-    glow: 'rgba(16, 185, 129, 0.35)',
-  },
+export const LEVEL_THEME: Record<MemorizationLevel, { label: string; color: string; bg: string; border: string; glow: string }> = {
+  none: { label: 'غير محفوظ', color: '#94a3b8', bg: '#1e293b', border: '#334155', glow: 'transparent' },
+  weak: { label: 'ضعيف / قيد الحفظ', color: '#fff', bg: '#ef4444', border: '#dc2626', glow: 'rgba(239,68,68,.35)' },
+  medium: { label: 'متوسط / يتطلب مراجعة', color: '#fff', bg: '#f59e0b', border: '#d97706', glow: 'rgba(245,158,11,.35)' },
+  mastered: { label: 'متقن تماماً', color: '#fff', bg: '#10b981', border: '#059669', glow: 'rgba(16,185,129,.35)' },
 }
 
-interface Props {
-  userId?: string
-  onClose?: () => void
-  memberName?: string
-}
+const levelFromEvaluation = (level: HifzEvaluationLevel): MemorizationLevel => level === 1 ? 'weak' : level === 2 ? 'medium' : 'mastered'
 
-export function QuranMemorizationGrid({ userId, onClose, memberName }: Props) {
-  const effectiveUserId = userId || 'current_user'
+interface Props { userId?: string; onClose?: () => void; memberName?: string; onPersistenceError?: (message: string) => void }
 
-  const [progress, setProgress] = useState<Record<number, MemorizationLevel>>(() => {
-    // Initialisation depuis le stockage local (cache rapide)
-    try {
-      const cached = localStorage.getItem(`quran_athman_${effectiveUserId}`)
-      return cached ? JSON.parse(cached) : {}
-    } catch {
-      return {}
-    }
-  })
-
+export function QuranMemorizationGrid({ userId, onClose, memberName, onPersistenceError }: Props) {
+  const { user, member: currentMember, majlisId } = useAuth()
+  const targetUserId = userId || user?.id || null
+  const [targetMemberId, setTargetMemberId] = useState<string | null>(null)
+  const [events, setEvents] = useState<Record<number, HifzLatestState>>({})
   const [activeThmoun, setActiveThmoun] = useState<ThmounMeta | null>(null)
+  const [sessionType, setSessionType] = useState<HifzSessionType>('revision')
+  const [evaluation, setEvaluation] = useState<HifzEvaluationLevel>(2)
   const [filterJuz, setFilterJuz] = useState<number | 'all'>('all')
-  const [, startTransition] = useTransition()
+  const [loading, setLoading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const sequenceRef = useRef(new Map<number, number>())
 
-  // UI Optimiste : mise à jour visuelle instantanée
-  const [optimisticProgress, setOptimisticProgress] = useOptimistic(
-    progress,
-    (state, update: { id: number; level: MemorizationLevel }) => ({
-      ...state,
-      [update.id]: update.level,
-    }),
-  )
-
-  // Recharger le cache local si effectiveUserId change
-  useEffect(() => {
-    try {
-      const cached = localStorage.getItem(`quran_athman_${effectiveUserId}`)
-      setProgress(cached ? JSON.parse(cached) : {})
-    } catch {
-      setProgress({})
-    }
-  }, [effectiveUserId])
-
-  // Chargement asynchrone des données depuis Supabase
   useEffect(() => {
     let cancelled = false
-
-    async function loadRemote() {
-      if (!userId) return
-      try {
-        const { data, error } = await supabase
-          .from('quran_athman_progress')
-          .select('thmoun_id, level')
-          .eq('user_id', userId)
-
-        if (!error && data && !cancelled) {
-          const map: Record<number, MemorizationLevel> = {}
-          data.forEach((row: { thmoun_id: number; level: MemorizationLevel }) => {
-            map[row.thmoun_id] = row.level
-          })
-          setProgress(map)
-          localStorage.setItem(`quran_athman_${effectiveUserId}`, JSON.stringify(map))
-        }
-      } catch (err) {
-        // Fallback silencieux sur le stockage local si la table n'est pas encore migrée
-        console.warn('Suivi Athman : lecture locale', err)
-      }
+    async function resolveMember() {
+      if (!targetUserId) { if (!cancelled) setTargetMemberId(null); return }
+      if (targetUserId === user?.id && currentMember) { if (!cancelled) setTargetMemberId(currentMember.id); return }
+      const { data, error } = await supabase.from('members').select('id').eq('user_id', targetUserId).maybeSingle()
+      if (error) { if (!cancelled) onPersistenceError?.(errorMessage(error)); return }
+      if (!cancelled) setTargetMemberId(data?.id ?? null)
     }
+    void resolveMember()
+    return () => { cancelled = true }
+  }, [targetUserId, user?.id, currentMember, onPersistenceError])
 
-    void loadRemote()
-    return () => {
-      cancelled = true
-    }
-  }, [userId, effectiveUserId])
+  const reload = useCallback(async (memberId = targetMemberId) => {
+    if (!memberId) { setEvents({}); return }
+    setLoading(true)
+    const { data, error } = await supabase.from('hifz_latest_state').select('id, member_id, majlis_id, thmoun_id, session_type, evaluation_level, recorded_by, source, created_at').eq('member_id', memberId)
+    setLoading(false)
+    if (error) { onPersistenceError?.(errorMessage(error)); return }
+    const next: Record<number, HifzLatestState> = {}
+    for (const row of (data ?? []) as HifzLatestState[]) next[row.thmoun_id] = row
+    setEvents(next)
+  }, [onPersistenceError, targetMemberId])
 
-  // Statistiques calculées en temps réel
+  useEffect(() => {
+    const timer = window.setTimeout(() => void reload(), 0)
+    return () => window.clearTimeout(timer)
+  }, [reload])
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !saving) setActiveThmoun(null) }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [saving])
+
+  const progress = useMemo(() => Object.fromEntries(Object.entries(events).map(([id, event]) => [id, levelFromEvaluation(event.evaluation_level)])) as Record<number, MemorizationLevel>, [events])
   const stats = useMemo(() => {
-    let mastered = 0
-    let medium = 0
-    let weak = 0
+    const values = Object.values(progress)
+    const mastered = values.filter((level) => level === 'mastered').length
+    const medium = values.filter((level) => level === 'medium').length
+    const weak = values.filter((level) => level === 'weak').length
+    return { mastered, medium, weak, percentage: ((mastered / 480) * 100).toFixed(1) }
+  }, [progress])
+  const ahzab = useMemo(() => Array.from({ length: 60 }, (_, index) => {
+    const hizb = index + 1
+    return [hizb, ATHMAN_CATALOG.filter((item) => item.hizb === hizb)] as const
+  }), [])
+  const visibleAhzab = useMemo(() => filterJuz === 'all' ? ahzab : ahzab.filter(([h]) => h === (filterJuz - 1) * 2 + 1 || h === filterJuz * 2), [ahzab, filterJuz])
 
-    for (let id = 1; id <= 480; id++) {
-      const lvl = optimisticProgress[id] || 'none'
-      if (lvl === 'mastered') mastered++
-      else if (lvl === 'medium') medium++
-      else if (lvl === 'weak') weak++
+  const saveSession = async () => {
+    if (!activeThmoun || !targetMemberId || !majlisId || saving) return
+    const thmounId = activeThmoun.id
+    const sequence = (sequenceRef.current.get(thmounId) ?? 0) + 1
+    sequenceRef.current.set(thmounId, sequence)
+    const previous = events[thmounId]
+    const optimistic: HifzLatestState = { id: `optimistic-${sequence}`, member_id: targetMemberId, majlis_id: majlisId, thmoun_id: thmounId, session_type: sessionType, evaluation_level: evaluation, recorded_by: user?.id ?? null, source: 'app', created_at: new Date().toISOString() }
+    setEvents((current) => ({ ...current, [thmounId]: optimistic }))
+    setSaving(true)
+    const { data, error } = await supabase.rpc('record_hifz_session', { _member_id: targetMemberId, _majlis_id: majlisId, _thmoun_id: thmounId, _session_type: sessionType, _evaluation_level: evaluation })
+    setSaving(false)
+    if (error) {
+      if (sequenceRef.current.get(thmounId) === sequence) setEvents((current) => { const restored = { ...current }; if (previous) restored[thmounId] = previous; else delete restored[thmounId]; return restored })
+      onPersistenceError?.('تعذّر حفظ جلسة الحفظ. تمت استعادة القيمة السابقة.')
+      return
     }
-
-    const percentage = ((mastered / 480) * 100).toFixed(1)
-    return { mastered, medium, weak, percentage }
-  }, [optimisticProgress])
-
-  // Regroupement des Athman par Hizb (1 à 60)
-  const ahzab = useMemo(() => {
-    const map = new Map<number, ThmounMeta[]>()
-    for (let h = 1; h <= 60; h++) map.set(h, [])
-    ATHMAN_CATALOG.forEach((item) => map.get(item.hizb)?.push(item))
-    return Array.from(map.entries())
-  }, [])
-
-  // Filtrage par Juz' (chaque Juz' = 2 Ahzab)
-  const visibleAhzab = useMemo(() => {
-    if (filterJuz === 'all') return ahzab
-    const startHizb = (filterJuz - 1) * 2 + 1
-    const endHizb = startHizb + 1
-    return ahzab.filter(([h]) => h === startHizb || h === endHizb)
-  }, [ahzab, filterJuz])
-
-  // Changement de niveau avec persistance optimiste
-  const handleLevelChange = async (thmounId: number, level: MemorizationLevel) => {
+    if (sequenceRef.current.get(thmounId) === sequence && data) setEvents((current) => ({ ...current, [thmounId]: data as HifzLatestState }))
     setActiveThmoun(null)
-
-    // 1. Mise à jour immédiate de l'écran
-    startTransition(() => {
-      setOptimisticProgress({ id: thmounId, level })
-    })
-
-    const nextState = { ...progress, [thmounId]: level }
-    setProgress(nextState)
-    try {
-      localStorage.setItem(`quran_athman_${effectiveUserId}`, JSON.stringify(nextState))
-    } catch {
-      // ignore
-    }
-
-    // 2. Synchronisation Supabase si userId est fourni
-    if (!userId) return
-    try {
-      if (level === 'none') {
-        await supabase
-          .from('quran_athman_progress')
-          .delete()
-          .match({ user_id: userId, thmoun_id: thmounId })
-      } else {
-        await supabase.from('quran_athman_progress').upsert(
-          {
-            user_id: userId,
-            thmoun_id: thmounId,
-            level,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id,thmoun_id' },
-        )
-      }
-    } catch (err) {
-      console.warn('Erreur synchronisation Supabase thmoun:', err)
-    }
   }
 
-  const formatSurahs = (surahs: SurahSegment[]) =>
-    surahs.map((s) => `${s.surahNameAr} (${s.fromAyah}-${s.toAyah})`).join(' ، ')
+  const formatSurahs = (surahs: SurahSegment[]) => surahs.map((surah) => `${surah.surahNameAr} (${surah.fromAyah}-${surah.toAyah})`).join('، ')
+  const canPersist = Boolean(targetMemberId && majlisId)
+  const openThmoun = (thmoun: ThmounMeta) => {
+    setSessionType('revision')
+    setEvaluation(events[thmoun.id]?.evaluation_level ?? 2)
+    setActiveThmoun(thmoun)
+  }
 
-  return (
-    <div className="quran-tracker" dir="rtl">
-      {/* 1. Header & Tableau de bord KPIs */}
-      <div className="quran-tracker__card">
-        <div className="stats-main">
-          <div className="stats-metric">
-            <span className="stats-number">{stats.percentage}%</span>
-            <span className="stats-caption">
-              {memberName ? `سجل حفظ: ${memberName} (480 ثمناً)` : 'نسبة الإتقان الإجمالية (480 ثمناً)'}
-            </span>
-            {onClose ? (
-              <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>
-                إغلاق الخريطة
-              </button>
-            ) : null}
-          </div>
-          <div className="progress-bar">
-            <div className="progress-bar__fill" style={{ width: `${stats.percentage}%` }} />
-          </div>
-        </div>
-
-        <div className="stats-badges">
-          <div className="stat-pill stat-pill--mastered">
-            <span className="dot dot--mastered" />
-            <span>
-              متقن: <strong>{stats.mastered}</strong> / 480
-            </span>
-          </div>
-          <div className="stat-pill stat-pill--medium">
-            <span className="dot dot--medium" />
-            <span>
-              مراجعة: <strong>{stats.medium}</strong>
-            </span>
-          </div>
-          <div className="stat-pill stat-pill--weak">
-            <span className="dot dot--weak" />
-            <span>
-              قيد الحفظ: <strong>{stats.weak}</strong>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Filtre rapide par Juz' (1 à 30) */}
-      <div className="juz-selector" aria-label="اختيار الجزء">
-        <button
-          type="button"
-          className={`juz-btn ${filterJuz === 'all' ? 'juz-btn--active' : ''}`}
-          onClick={() => setFilterJuz('all')}
-        >
-          كامل المصحف (60 حزباً)
-        </button>
-        {Array.from({ length: 30 }, (_, i) => i + 1).map((juz) => (
-          <button
-            key={juz}
-            type="button"
-            className={`juz-btn ${filterJuz === juz ? 'juz-btn--active' : ''}`}
-            onClick={() => setFilterJuz(juz)}
-          >
-            الجزء {juz}
-          </button>
-        ))}
-      </div>
-
-      {/* 3. Grille des 60 Ahzab */}
-      <div className="ahzab-grid">
-        {visibleAhzab.map(([hizbNumber, athman]) => {
-          const masteredInHizb = athman.filter(
-            (t) => optimisticProgress[t.id] === 'mastered',
-          ).length
-          const surahsInHizb = getSurahsTrackForHizb(hizbNumber)
-
-          return (
-            <div key={hizbNumber} className="hizb-card">
-              <div className="hizb-card__header">
-                <span className="hizb-title">الحزب {hizbNumber}</span>
-                <span className="hizb-score">{masteredInHizb} / 8</span>
-              </div>
-
-              {/* Ligne des Sourates (Superposition géométrique sur les 8 blocs) */}
-              <div className="sourates-track" aria-label={`سور الحزب ${hizbNumber}`}>
-                {surahsInHizb.map((span, idx) => {
-                  const flex = span.flexWeight
-                  const isCompact = flex <= 1.2
-                  const hasCluster = span.clusterSurahs && span.clusterSurahs.length > 1
-
-                  const tooltip = hasCluster
-                    ? `السور: ${span.clusterSurahs!.map((s) => s.name).join(' ، ')} (الثمن ${span.startQuarter})`
-                    : `سورة ${span.surahNameAr} — [أثمان ${span.startQuarter === span.endQuarter ? span.startQuarter : `${span.startQuarter} إلى ${span.endQuarter}`}]`
-
-                  return (
-                    <div
-                      key={`${span.surahNumber}-${idx}`}
-                      className={`surah-indicator-bar ${isCompact ? 'surah-indicator-bar--compact' : ''}`}
-                      style={{ flex }}
-                      title={tooltip}
-                    >
-                      <span className="surah-indicator-label">
-                        {span.surahNameAr}
-                        {hasCluster && (
-                          <span className="surah-cluster-count">
-                            +{span.clusterSurahs!.length - 1}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* 8 Cubes interactifs */}
-              <div className="athman-row">
-                {athman.map((thmoun) => {
-                  const currentLevel = optimisticProgress[thmoun.id] || 'none'
-                  const theme = LEVEL_THEME[currentLevel]
-
-                  return (
-                    <button
-                      key={thmoun.id}
-                      type="button"
-                      className="cube-btn"
-                      style={{
-                        backgroundColor: theme.bg,
-                        borderColor: theme.border,
-                        boxShadow: `0 2px 8px ${theme.glow}`,
-                      }}
-                      title={`ثمن ${thmoun.quarter} : ${thmoun.surahsSummary}`}
-                      onClick={() => setActiveThmoun(thmoun)}
-                    >
-                      <span className="cube-btn__idx">{thmoun.quarter}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* 4. Popover contextuel de sélection */}
-      {activeThmoun && (
-        <div className="popover-backdrop" onClick={() => setActiveThmoun(null)}>
-          <div className="popover-content" onClick={(e) => e.stopPropagation()}>
-            <div className="popover-header">
-              <span className="popover-tag">
-                الحزب {activeThmoun.hizb} — {activeThmoun.quarterLabelAr}
-              </span>
-              <h3 className="popover-snippet">« {activeThmoun.startSnippetAr} »</h3>
-              <p className="popover-surahs">{formatSurahs(activeThmoun.surahs)}</p>
-            </div>
-
-            <div className="popover-choices">
-              {(Object.keys(LEVEL_THEME) as MemorizationLevel[]).map((lvl) => {
-                const conf = LEVEL_THEME[lvl]
-                const isSelected = (optimisticProgress[activeThmoun.id] || 'none') === lvl
-
-                return (
-                  <button
-                    key={lvl}
-                    type="button"
-                    className={`level-choice-btn ${isSelected ? 'level-choice-btn--current' : ''}`}
-                    style={{ backgroundColor: conf.bg, color: conf.color }}
-                    onClick={() => handleLevelChange(activeThmoun.id, lvl)}
-                  >
-                    <span>{conf.label}</span>
-                    {isSelected && <span className="check-icon">✓</span>}
-                  </button>
-                )
-              })}
-            </div>
-
-            <button
-              type="button"
-              className="popover-close-btn"
-              onClick={() => setActiveThmoun(null)}
-            >
-              إلغاء
-            </button>
-          </div>
-        </div>
-      )}
+  return <div className="quran-tracker" dir="rtl" aria-busy={loading}>
+    <div className="quran-tracker__card">
+      <div className="stats-main"><div className="stats-metric"><span className="stats-number">{stats.percentage}%</span><span className="stats-caption">{memberName ? `سجل حفظ: ${memberName} (480 ثمناً)` : 'نسبة الإتقان الإجمالية (480 ثمناً)'}</span>{onClose ? <button type="button" className="btn btn--ghost btn--sm" onClick={onClose}>إغلاق الخريطة</button> : null}</div><div className="progress-bar"><div className="progress-bar__fill" style={{ width: `${stats.percentage}%` }} /></div></div>
+      <div className="stats-badges"><div className="stat-pill stat-pill--mastered"><span className="dot dot--mastered" />متقن: <strong>{stats.mastered}</strong> / 480</div><div className="stat-pill stat-pill--medium"><span className="dot dot--medium" />مراجعة: <strong>{stats.medium}</strong></div><div className="stat-pill stat-pill--weak"><span className="dot dot--weak" />قيد الحفظ: <strong>{stats.weak}</strong></div></div>
+      {!canPersist ? <p className="hint">اختر مجلساً نشطاً وعضواً مرتبطاً بحساب قبل تسجيل جلسة جديدة.</p> : null}
     </div>
-  )
+    <div className="juz-selector" aria-label="اختيار الجزء"><button type="button" className={`juz-btn ${filterJuz === 'all' ? 'juz-btn--active' : ''}`} onClick={() => setFilterJuz('all')}>كامل المصحف</button>{Array.from({ length: 30 }, (_, index) => index + 1).map((juz) => <button key={juz} type="button" className={`juz-btn ${filterJuz === juz ? 'juz-btn--active' : ''}`} onClick={() => setFilterJuz(juz)}>الجزء {juz}</button>)}</div>
+    <div className="ahzab-grid">{visibleAhzab.map(([hizbNumber, athman]) => <div key={hizbNumber} className="hizb-card"><div className="hizb-card__header"><span className="hizb-title">الحزب {hizbNumber}</span><span className="hizb-score">{athman.filter((item) => progress[item.id] === 'mastered').length} / 8</span></div><div className="sourates-track" aria-label={`سور الحزب ${hizbNumber}`}>{getSurahsTrackForHizb(hizbNumber).map((span, index) => <div key={`${span.surahNumber}-${index}`} className={`surah-indicator-bar ${span.flexWeight <= 1.2 ? 'surah-indicator-bar--compact' : ''}`} style={{ flex: span.flexWeight }} title={`سورة ${span.surahNameAr}`}><span className="surah-indicator-label">{span.surahNameAr}{span.clusterSurahs && span.clusterSurahs.length > 1 ? <span className="surah-cluster-count">+{span.clusterSurahs.length - 1}</span> : null}</span></div>)}</div><div className="athman-row">{athman.map((thmoun) => { const level = progress[thmoun.id] ?? 'none'; const theme = LEVEL_THEME[level]; return <button key={thmoun.id} type="button" className="cube-btn" style={{ backgroundColor: theme.bg, borderColor: theme.border, boxShadow: `0 2px 8px ${theme.glow}` }} title={`ثمن ${thmoun.quarter}: ${thmoun.surahsSummary}`} onClick={() => openThmoun(thmoun)}><span className="cube-btn__idx">{thmoun.quarter}</span></button> })}</div></div>)}</div>
+    {activeThmoun ? <div className="popover-backdrop" role="presentation" onMouseDown={() => !saving && setActiveThmoun(null)}><section className="hifz-dialog" role="dialog" aria-modal="true" aria-labelledby="hifz-dialog-title" onMouseDown={(event) => event.stopPropagation()}><header className="popover-header"><span className="popover-tag">الحزب {activeThmoun.hizb} — {activeThmoun.quarterLabelAr}</span><h3 id="hifz-dialog-title" className="popover-snippet">« {activeThmoun.startSnippetAr} »</h3><p className="popover-surahs">{formatSurahs(activeThmoun.surahs)}</p></header><div className="hifz-dialog__body"><fieldset><legend>نوع الجلسة</legend><div className="popover-choices"><button autoFocus type="button" className={`level-choice-btn ${sessionType === 'nouvelle_memorisation' ? 'level-choice-btn--current' : ''}`} onClick={() => setSessionType('nouvelle_memorisation')}>حفظ جديد</button><button type="button" className={`level-choice-btn ${sessionType === 'revision' ? 'level-choice-btn--current' : ''}`} onClick={() => setSessionType('revision')}>مراجعة</button></div></fieldset><fieldset><legend>التقييم</legend><div className="popover-choices">{([1, 2, 3] as HifzEvaluationLevel[]).map((level) => <button key={level} type="button" className={`level-choice-btn ${evaluation === level ? 'level-choice-btn--current' : ''}`} style={{ backgroundColor: LEVEL_THEME[levelFromEvaluation(level)].bg }} onClick={() => setEvaluation(level)}>{LEVEL_THEME[levelFromEvaluation(level)].label}</button>)}</div></fieldset>{events[activeThmoun.id] ? <p className="hint">آخر تقييم: {LEVEL_THEME[levelFromEvaluation(events[activeThmoun.id].evaluation_level)].label} — {new Intl.DateTimeFormat('ar-MA', { dateStyle: 'medium' }).format(new Date(events[activeThmoun.id].created_at))}</p> : null}</div><footer className="modal__actions"><button type="button" className="btn btn--ghost" disabled={saving} onClick={() => setActiveThmoun(null)}>إلغاء</button><button type="button" className="btn btn--primary" disabled={!canPersist || saving} onClick={() => void saveSession()}>{saving ? 'جارٍ الحفظ…' : 'تسجيل الجلسة'}</button></footer></section></div> : null}
+  </div>
 }

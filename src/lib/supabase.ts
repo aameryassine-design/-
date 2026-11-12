@@ -5,8 +5,10 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
 export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseKey)
 
-export const supabase: SupabaseClient = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseKey, {
+export const supabase: SupabaseClient = createClient(
+  supabaseUrl || 'http://127.0.0.1:54321',
+  supabaseKey || 'not-configured',
+  {
       auth: {
         // La session est conservée : indispensable dans l'APK, où l'on ne veut
         // pas ressaisir son mot de passe à chaque ouverture.
@@ -16,8 +18,8 @@ export const supabase: SupabaseClient = isSupabaseConfigured
         // routeur par hash entrerait en conflit avec la détection d'URL.
         detectSessionInUrl: false,
       },
-    })
-  : (null as unknown as SupabaseClient)
+  },
+)
 
 const MESSAGES: Record<string, string> = {
   'Invalid login credentials': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',

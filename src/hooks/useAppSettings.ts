@@ -39,7 +39,8 @@ export function useAppSettings() {
   }, [])
 
   useEffect(() => {
-    void fetchSettings()
+    const timer = window.setTimeout(() => void fetchSettings(), 0)
+    return () => window.clearTimeout(timer)
   }, [fetchSettings])
 
   const setAutoApprove = useCallback(
@@ -50,19 +51,16 @@ export function useAppSettings() {
       setSettings((current) => (current ? { ...current, auto_approve_members: enabled } : null))
 
       try {
-        const { error: upsertErr } = await supabase
-          .from('app_settings')
-          .upsert({
-            id: 1,
-            auto_approve_members: enabled,
-            updated_at: new Date().toISOString(),
-          })
+        const { data, error: rpcError } = await supabase.rpc('set_auto_approve_members', {
+          _enabled: enabled,
+        })
 
-        if (upsertErr) {
+        if (rpcError) {
           setSettings(prev)
-          setError(errorMessage(upsertErr))
+          setError(errorMessage(rpcError))
           return false
         }
+        if (data) setSettings(data as AppSettings)
         return true
       } catch (err) {
         setSettings(prev)

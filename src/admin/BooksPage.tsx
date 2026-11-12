@@ -72,12 +72,17 @@ export function BooksPage() {
       pdf_path: pdfPath,
     })
 
-    setBusy(false)
-
     if (error) {
+      if (pdfPath) {
+        const { error: cleanupError } = await supabase.storage.from('books').remove([pdfPath])
+        if (cleanupError) toast('تعذّر تنظيف ملف PDF بعد فشل حفظ الكتاب.', 'error')
+      }
+      setBusy(false)
       toast(errorMessage(error), 'error')
       return
     }
+
+    setBusy(false)
 
     setTitle('')
     setAuthor('')
@@ -103,11 +108,16 @@ export function BooksPage() {
 
     const { error } = await supabase.from('books').update({ pdf_path: path }).eq('id', book.id)
     if (error) {
+      const { error: cleanupError } = await supabase.storage.from('books').remove([path])
+      if (cleanupError) toast('تعذّر تنظيف الملف الجديد بعد فشل الاستبدال.', 'error')
       toast(errorMessage(error), 'error')
       return
     }
 
-    if (book.pdf_path) await supabase.storage.from('books').remove([book.pdf_path])
+    if (book.pdf_path) {
+      const { error: cleanupError } = await supabase.storage.from('books').remove([book.pdf_path])
+      if (cleanupError) toast('تم الاستبدال، لكن تعذّر حذف الملف القديم.', 'error')
+    }
     toast('تم استبدال الملف')
     library.refresh()
   }
@@ -175,7 +185,10 @@ export function BooksPage() {
       )
       return
     }
-    if (book.pdf_path) await supabase.storage.from('books').remove([book.pdf_path])
+    if (book.pdf_path) {
+      const { error: storageError } = await supabase.storage.from('books').remove([book.pdf_path])
+      if (storageError) toast('تم حذف السجل، لكن تعذّر حذف ملف PDF القديم.', 'error')
+    }
     toast('تم حذف الكتاب')
     library.refresh()
   }

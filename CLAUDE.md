@@ -5,7 +5,7 @@ Ce document résume l'état du projet pour qu'un agent puisse reprendre le trava
 ## 1. Le propriétaire et la façon de travailler
 
 - Propriétaire : Yassine (aameryassine@gmail.com). Communique en français, interface de l'app en arabe.
-- Gestion Git par l'agent : à la fin de chaque tâche, l'agent exécute `git add .` et `git commit -m "feat/fix: [description]"`, puis demande une confirmation rapide avant d'exécuter `git push origin main` vers la production Netlify.
+- Gestion Git : aucun commit, push, déploiement ou migration distante ne doit être exécuté sans instruction explicite. Une intégration Git vers Vercel déclenche la publication selon la configuration du projet.
 - Base de production réelle : toute opération destructive sur la base (migration, suppression, modification de policies) se fait **après accord explicite**, avec un dry-run montré avant.
 - Ne manipule jamais de secret en clair dans la conversation (mot de passe de base, token Supabase, clés). Les commandes interactives (login, link avec mot de passe) doivent être lancées **par Yassine dans son propre terminal** : les commandes `!` de Claude Code ne sont pas interactives (non-TTY).
 - Le terminal Windows affiche l'arabe **à l'envers**. Ce n'est pas un bug des fichiers : vérifie dans l'éditeur ou le navigateur avant de « corriger » du texte arabe.
@@ -20,7 +20,7 @@ Mohammed et Yassine collaborent sur la branche `main` du même dépôt. Pour sim
 Le script enchaîne automatiquement :
 1. `git pull origin main` pour récupérer les dernières modifications de l'autre collaborateur.
 2. Saisie du message de commit puis `git add .` et `git commit -m "..."`.
-3. `git push origin main` pour publier sur GitHub, ce qui déclenche automatiquement la mise à jour du site par Netlify sur [https://jalessa.netlify.app](https://jalessa.netlify.app).
+3. `git push origin main` peut déclencher une Preview ou une production Vercel selon la configuration distante ; vérifier la cible avant tout push.
 
 ## 2. Ce que fait l'application
 
@@ -84,7 +84,7 @@ L'application repose sur une **architecture multi-tenant (Multi-Majalis) hermét
 |---|---|
 | Projet Supabase de production | `kxfslwsoyldzgukucimc` (nom « تتبع الجلسة ») |
 | Dépôt GitHub | `aameryassine-design/-` (privé, nom « - » à renommer en `jalessa` à terme) |
-| Site | https://jalessa.netlify.app, déployé automatiquement par Netlify à chaque push sur `main` |
+| Site | Domaine Vercel à confirmer ; le dépôt ne doit pas inventer un domaine de production |
 | Build APK | GitHub Actions, workflow `.github/workflows/android.yml` (déclenchement manuel) |
 
 **Attention, autres projets Supabase à ne jamais toucher** : `ydmfrirnzyibnvkonnjr` (« kpp36920-coder's Project ») et `wfrfjdwtjkpeyrmfyxgk`. Avant toute commande CLI, vérifie `supabase/.temp/project-ref` : il doit contenir `kxfslwsoyldzgukucimc`.
@@ -92,7 +92,7 @@ L'application repose sur une **architecture multi-tenant (Multi-Majalis) hermét
 ### Variables d'environnement
 
 - Local (`.env`, non versionné) : `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`. C'est la référence des bonnes valeurs.
-- Netlify : les deux mêmes, en secret. `VITE_APP_PASSWORD` (v1) peut être supprimée.
+- Vercel : les deux mêmes variables publiques, séparées entre Development, Preview et Production. `VITE_APP_PASSWORD` (v1) peut être supprimée.
 - GitHub Actions (secrets du dépôt) : les deux mêmes.
 - Jamais la clé `service_role` / secret dans le front ou l'APK.
 
@@ -102,7 +102,7 @@ Node **22** (Capacitor 8 l'exige), Java 21 (Temurin, `setup-java@v5`), `npm ci`,
 
 ## 5. Base de données
 
-Migrations dans `supabase/migrations/`, **toutes appliquées en production** (via `supabase db push`) :
+Migrations dans `supabase/migrations/` : leur état distant doit être confirmé par lecture de l'historique avant toute application. Ne jamais exécuter `supabase db push` sans précontrôle et accord explicite.
 
 1. `20260923090100_auth_roles.sql` — profils, rôles (`user_roles`, type `app_role`), trigger d'inscription `handle_new_user`
 2. `20260923090200_schema_v2.sql` — nouvelles tables (majalis, tâches, entrées, programmes…). Les tables v1 modifiées sont archivées en `*_v1` (ex. `individual_tasks_v1`)
@@ -120,7 +120,7 @@ Plan FREE : pas de sauvegarde téléchargeable dans *Database → Backups*. Une 
 ## 6. État actuel
 
 Fait :
-- Migrations 1 à 5 appliquées sur `kxfslwsoyldzgukucimc`.
+- L'état réellement appliqué sur `kxfslwsoyldzgukucimc` doit être contrôlé avant livraison ; les indications historiques précédentes sont contradictoires.
 - Code v2 sur GitHub (`main`).
 - Workflow APK fonctionnel (run #3 réussi).
 - Compte superviseur de Yassine en place.
@@ -132,13 +132,13 @@ En cours au moment de la passation :
 
 > **Note sur l'authentification** : La vérification par e-mail a été désactivée globalement sur le projet Supabase pour fluidifier l'accès. Tout nouvel utilisateur s'inscrivant est automatiquement confirmé, obtient le rôle `member` et voit sa fiche créée immédiatement.
 
-1. **Appliquer la migration 6** (`20260924091000_auto_member_role.sql`) sur la base de production (après validation du dry-run).
+1. Comparer l'historique de migrations distant, le schéma et les prechecks générés localement avant toute application.
 2. **Vérifier l'APK corrigé** : connexion d'un compte de test inscrit directement dans l'app, espace membre affiché.
 3. **Vérifier le site en ligne** : connexion superviseur, membres et présences v1 visibles.
 4. **Lancer `rls_tests.sql`** dans le SQL Editor et obtenir zéro échec.
-5. **Supabase → Authentication → URL Configuration** : Site URL = `https://jalessa.netlify.app`.
+5. **Supabase → Authentication → URL Configuration** : définir le domaine Vercel choisi et ses URL de redirection après création du projet Vercel.
 6. **Mise en service** : créer les majalis, affecter les membres à leur majlis, et attribuer les rôles des responsables depuis l'écran الحسابات.
-7. Optionnel : renommer le dépôt `-` en `jalessa` (puis vérifier le lien dans Netlify).
+7. Optionnel : renommer le dépôt `-` en `jalessa` et vérifier la liaison Vercel.
 
 ## 8. Vigilance
 
